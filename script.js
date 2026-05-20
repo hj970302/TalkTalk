@@ -505,10 +505,10 @@ async function openRoomFromData(targetId) {
     
     // 새 채팅방 생성
     const { data: newRoom, error: roomError } = await supabaseClient
-      .from('chat_rooms')
-      .insert({ name: friend.name, is_group: false, created_by: currentUserId })
-      .select()
-      .single();
+  .from('chat_rooms')
+  .insert({ name: friend.name, is_group: false })
+  .select()
+  .single();
     
     if (roomError) {
       console.error("방 생성 오류:", roomError);
@@ -577,8 +577,15 @@ async function loadMessages(roomId) {
 }
 
 function appendMessageToUI(msg) {
-  const container = document.getElementById('room-messages');
-  if (!container) return;
+  // ...
+  if (msg.type === 'image' && msg.image_url) {
+    bubble.classList.add('image-bubble');
+    bubble.innerHTML = `<img src="${msg.image_url}" ...>`;
+  } else {
+    bubble.textContent = msg.content || '사진';  // text → content
+  }
+  // ...
+}
   
   const isMine = msg.sender_id === currentUserId;
   const row = document.createElement('div');
@@ -618,8 +625,8 @@ async function sendMsg() {
   await supabaseClient.from('messages').insert({
     room_id: currentRoom.id,
     sender_id: currentUserId,
-    text: text,
-    is_image: false
+    content: text,      // text → content
+    type: 'text'        // is_image 대신 type
   });
 }
 
