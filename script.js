@@ -199,38 +199,62 @@ function toggleAuthForm(mode) {
 }
 
 async function handleRegister() {
-  const id = document.getElementById('reg-id').value.trim();
+  const username = document.getElementById('reg-id').value.trim();
   const pw = document.getElementById('reg-pw').value.trim();
+  const pwConfirm = document.getElementById('reg-pw-confirm').value.trim();
   const name = document.getElementById('reg-name').value.trim();
-  if (!id || !pw || !name) { 
+  
+  // 빈칸 확인
+  if (!username || !pw || !pwConfirm || !name) { 
     alert("모든 빈칸을 입력해주세요."); 
     return; 
   }
   
-  if (!id.includes('@')) {
-    alert("유효한 이메일 주소를 입력해주세요.");
+  // 비밀번호 일치 확인
+  if (pw !== pwConfirm) {
+    alert("비밀번호가 일치하지 않습니다.");
     return;
   }
   
+  // 비밀번호 길이 확인
+  if (pw.length < 4) {
+    alert("비밀번호는 4자 이상 입력해주세요.");
+    return;
+  }
+  
+  // 중복 확인: 이미 가입된 아이디인지 Supabase에서 조회
+  const { data: existingUser } = await supabaseClient
+    .from('profiles')
+    .select('username')
+    .eq('username', username)
+    .single();
+  
+  if (existingUser) {
+    alert("이미 존재하는 아이디입니다.");
+    return;
+  }
+  
+  // Supabase Auth에는 이메일 형식이 필요하므로 가상 이메일 생성
+  const fakeEmail = `${username}@talktalk.app`;
+  
   const { data, error } = await supabaseClient.auth.signUp({
-    email: id,
+    email: fakeEmail,
     password: pw,
     options: {
-      data: { 
-        username: id.split('@')[0], 
-        name: name 
-      }
+      data: { username: username, name: name }
     }
   });
   
   if (error) { 
-    alert("회원가입에 실패했습니다. 다시 시도해주세요.");  // 👈 여기!
+    console.error("가입 오류:", error);
+    alert("회원가입에 실패했습니다. 다시 시도해주세요.");
     return; 
   }
   
+  // profiles 테이블에 사용자 정보 저장
   await supabaseClient.from('profiles').insert({
     id: data.user.id,
-    username: id.split('@')[0],
+    username: username,
     name: name,
     status: '톡톡 가입을 환영합니다!'
   });
@@ -245,24 +269,40 @@ async function handleRegister() {
   
   document.getElementById('reg-id').value = "";
   document.getElementById('reg-pw').value = "";
+  document.getElementById('reg-pw-confirm').value = "";
   document.getElementById('reg-name').value = "";
 }
-
 async function handleLogin() {
-  const id = document.getElementById('login-id').value.trim();
+  const username = document.getElementById('login-id').value.trim();
   const pw = document.getElementById('login-pw').value.trim();
-  if (!id || !pw) { 
+  
+  if (!username || !pw) { 
     alert("아이디와 비밀번호를 모두 입력해주세요."); 
     return; 
   }
   
+  // username으로 profiles 테이블에서 이메일 찾기
+  const { data: profile } = await supabaseClient
+    .from('profiles')
+    .select('id')
+    .eq('username', username)
+    .single();
+  
+  if (!profile) {
+    alert("아이디 또는 비밀번호가 일치하지 않습니다.");
+    return;
+  }
+  
+  // 가상 이메일로 로그인
+  const fakeEmail = `${username}@talktalk.app`;
+  
   const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email: id,
+    email: fakeEmail,
     password: pw
   });
   
   if (error) { 
-    alert("아이디 또는 비밀번호가 일치하지 않습니다.");  // 👈 여기!
+    alert("아이디 또는 비밀번호가 일치하지 않습니다.");
     return; 
   }
   
