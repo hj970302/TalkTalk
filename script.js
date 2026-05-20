@@ -204,38 +204,33 @@ async function handleRegister() {
   const pwConfirm = document.getElementById('reg-pw-confirm').value.trim();
   const name = document.getElementById('reg-name').value.trim();
   
-  // 빈칸 확인
   if (!username || !pw || !pwConfirm || !name) { 
     alert("모든 빈칸을 입력해주세요."); 
     return; 
   }
   
-  // 비밀번호 일치 확인
   if (pw !== pwConfirm) {
     alert("비밀번호가 일치하지 않습니다.");
     return;
   }
   
-  // 비밀번호 길이 확인
   if (pw.length < 4) {
     alert("비밀번호는 4자 이상 입력해주세요.");
     return;
   }
   
-  // 중복 확인: 이미 가입된 아이디인지 Supabase에서 조회
   const { data: existingUser } = await supabaseClient
     .from('profiles')
     .select('username')
     .eq('username', username)
-    .single();
+    .maybeSingle();
   
   if (existingUser) {
     alert("이미 존재하는 아이디입니다.");
     return;
   }
   
-  // Supabase Auth에는 이메일 형식이 필요하므로 가상 이메일 생성
-  const fakeEmail = `${username}@talktalk.app`;
+  const fakeEmail = username + "@talktalk.app";
   
   const { data, error } = await supabaseClient.auth.signUp({
     email: fakeEmail,
@@ -246,18 +241,29 @@ async function handleRegister() {
   });
   
   if (error) { 
-    console.error("가입 오류:", error);
+    console.error("Auth signup error:", error);
     alert("회원가입에 실패했습니다. 다시 시도해주세요.");
     return; 
   }
   
-  // profiles 테이블에 사용자 정보 저장
-  await supabaseClient.from('profiles').insert({
+  if (!data.user) {
+    alert("회원가입에 실패했습니다. 다시 시도해주세요.");
+    return;
+  }
+  
+  const { error: profileError } = await supabaseClient.from('profiles').insert({
     id: data.user.id,
     username: username,
     name: name,
-    status: '톡톡 가입을 환영합니다!'
+    status: '환영합니다'
   });
+  
+  if (profileError) {
+    console.error("Profile save error:", profileError);
+    await supabaseClient.auth.admin.deleteUser(data.user.id);
+    alert("회원가입에 실패했습니다. 다시 시도해주세요.");
+    return;
+  }
   
   localStorage.setItem('talktalk_session', data.user.id);
   currentUserId = data.user.id;
@@ -265,7 +271,7 @@ async function handleRegister() {
   
   const authScreen = document.getElementById('auth-screen');
   if (authScreen) authScreen.style.display = 'none';
-  showToast("가입 축하", `${name}님의 아이디가 생성되었습니다.`, "#2ed573");
+  showToast("가입 축하", name + "님의 아이디가 생성되었습니다.", "#2ed573");
   
   document.getElementById('reg-id').value = "";
   document.getElementById('reg-pw').value = "";
@@ -281,20 +287,18 @@ async function handleLogin() {
     return; 
   }
   
-  // username으로 profiles 테이블에서 이메일 찾기
-  const { data: profile } = await supabaseClient
+  const { data: profile, error: profileError } = await supabaseClient
     .from('profiles')
-    .select('id')
+    .select('id, username, name')
     .eq('username', username)
-    .single();
+    .maybeSingle();
   
-  if (!profile) {
+  if (profileError || !profile) {
     alert("아이디 또는 비밀번호가 일치하지 않습니다.");
     return;
   }
   
-  // 가상 이메일로 로그인
-  const fakeEmail = `${username}@talktalk.app`;
+  const fakeEmail = username + "@talktalk.app";
   
   const { data, error } = await supabaseClient.auth.signInWithPassword({
     email: fakeEmail,
@@ -312,12 +316,11 @@ async function handleLogin() {
   
   const authScreen = document.getElementById('auth-screen');
   if (authScreen) authScreen.style.display = 'none';
-  showToast("로그인 성공", `${currentUserProfile?.name}님 반갑습니다!`, "#fee500");
+  showToast("로그인 성공", profile.name + "님 반갑습니다!", "#fee500");
   
   document.getElementById('login-id').value = "";
   document.getElementById('login-pw').value = "";
 }
-
 async function handleLogout() {
   await supabaseClient.auth.signOut();
   localStorage.removeItem('talktalk_session');
