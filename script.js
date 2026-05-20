@@ -1,4 +1,3 @@
-
 /* ==========================================================================
    톡톡 (TalkTalk) - Supabase 실시간 채팅 버전
    ========================================================================== */
@@ -869,4 +868,3 @@ document.getElementById('reg-pw')?.addEventListener('keypress', (e) => {
 document.getElementById('reg-name')?.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') handleRegister();
 });
-
