@@ -205,7 +205,7 @@ async function handleRegister() {
   if (!id || !pw || !name) { alert("모든 빈칸을 입력해주세요."); return; }
   
   const { data, error } = await supabaseClient.auth.signUp({
-    email: `${id}@talktalk.local`,
+    email: id,
     password: pw,
     options: {
       data: { username: id, name: name }
