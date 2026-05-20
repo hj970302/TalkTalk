@@ -651,20 +651,22 @@ async function sendMsg() {
   if (!text || !currentRoom.id) return;
   if (input) input.value = '';
   
-  console.log("전송 시도:", { room_id: currentRoom.id, sender_id: currentUserId, content: text });
+  // 단순한 INSERT 시도
+  const result = await supabaseClient
+    .from('messages')
+    .insert({
+      room_id: currentRoom.id,
+      sender_id: currentUserId,
+      content: text,
+      type: 'text'
+    });
   
-  const { data, error } = await supabaseClient.from('messages').insert({
-    room_id: currentRoom.id,
-    sender_id: currentUserId,
-    content: text,
-    type: 'text'
-  });
+  console.log("결과:", result);
   
-  if (error) {
-    console.error("메시지 전송 오류:", error);
-    showToast("오류", "메시지를 보낼 수 없습니다.", "#ff4757");
+  if (result.error) {
+    alert("오류: " + result.error.message);
   } else {
-    console.log("전송 성공:", data);
+    console.log("성공!");
   }
 }
 
