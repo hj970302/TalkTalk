@@ -5,12 +5,12 @@
 // ============================================================
 // 🔥 여기만 본인 값으로 교체하세요! 🔥
 // ============================================================
-const SUPABASE_URL = 'https://yrndqghsdtxoajgxvqrv.supabaseClient.co';
+const SUPABASE_URL = 'https://yrndqghsdtxoajgxvqrv.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlybmRxZ2hzZHR4b2FqZ3h2cXJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNjM3NTksImV4cCI6MjA5NDgzOTc1OX0.jEjISPblbaz-EFTE63kj8wG85lqWSdr_HAloukwzjnc';
 // ============================================================
 
 // Supabase 클라이언트 초기화
-const supabaseClient = window.supabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ==========================================================================
    전역 상태 변수
@@ -159,10 +159,6 @@ async function loadFriends() {
     id: f.friend_id,
     ...f.profiles
   })) || [];
-
-  // 추천 친구용: 전체 프로필 목록 로드
-  const { data: allProfiles } = await supabaseClient.from('profiles').select('id, username, name, status, avatar');
-  window._allProfiles = allProfiles || [];
 }
 
 async function loadChatRooms() {
@@ -369,53 +365,7 @@ function renderFriends() {
     html += normalFriends.map(f => makeFriendItemHTML(f)).join('');
   }
   html += `</div>`;
-
-  // 추천 친구 섹션
-  const recommendHtml = renderRecommendSection();
-  if (recommendHtml) html += recommendHtml;
-
   container.innerHTML = html;
-}
-
-function renderRecommendSection() {
-  if (!window._allProfiles || window._allProfiles.length === 0) return '';
-  const friendIds = new Set(friendsList.map(f => f.id));
-  const recommends = window._allProfiles.filter(p => p.id !== currentUserId && !friendIds.has(p.id));
-  if (recommends.length === 0) return '';
-  let html = `<div class="normal-section"><div class="section-title" style="color:#888;">추천 친구 ${recommends.length}</div>`;
-  html += recommends.map(p => `
-    <div class="friend-item" style="opacity:0.75;">
-      <div class="avatar-sm avatar-base">${p.avatar ? `<img src="${p.avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : '<i class="ti ti-user"></i>'}</div>
-      <div style="flex:1;"><div class="fi-name">${p.name}</div><div class="fi-status">${p.status || '안녕하세요!'}</div></div>
-      <button onclick="quickAddFriend('${p.id}','${p.username}','${p.name}')" style="background:#fee500;border:none;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;">추가</button>
-    </div>
-  `).join('');
-  html += `</div>`;
-  return html;
-}
-
-async function quickAddFriend(friendId, friendUsername, friendName) {
-  if (friendsList.some(f => f.id === friendId)) { showToast("알림","이미 친구입니다.","#888"); return; }
-
-  await supabaseClient.from('friendships').insert({ user_id: currentUserId, friend_id: friendId, status: 'accepted' });
-
-  const { data: room } = await supabaseClient.from('chat_rooms').insert({
-    name: friendName, is_group: false, created_by: currentUserId
-  }).select().single();
-
-  if (room) {
-    await supabaseClient.from('chat_room_members').insert([
-      { room_id: room.id, user_id: currentUserId },
-      { room_id: room.id, user_id: friendId }
-    ]);
-    chatRoomsList.push(room);
-  }
-
-  const { data: fullProfile } = await supabaseClient.from('profiles').select('*').eq('id', friendId).single();
-  friendsList.push({ id: friendId, username: friendUsername, name: friendName, status: fullProfile?.status || '', avatar: fullProfile?.avatar || null, isFavorite: false });
-  renderFriends();
-  renderChats();
-  showToast("친구 추가", `${friendName}님과 친구가 되었습니다!`, "#2ed573");
 }
 
 function makeFriendItemHTML(f) {
@@ -642,7 +592,7 @@ async function addNewFriendWithVerify() {
   
   const { data: profile } = await supabaseClient
     .from('profiles')
-    .select('id, username, name, status, avatar')
+    .select('id, name')
     .eq('username', username)
     .single();
   
@@ -667,16 +617,8 @@ async function addNewFriendWithVerify() {
     { room_id: room.id, user_id: profile.id }
   ]);
   
-  // 즉시 로컬 목록에 추가 (새로고침 없이 반영)
-  friendsList.push({
-    id: profile.id,
-    username: profile.username || '',
-    name: profile.name,
-    status: profile.status || '안녕하세요!',
-    avatar: profile.avatar || null,
-    isFavorite: false
-  });
-  chatRoomsList.push(room);
+  await loadFriends();
+  await loadChatRooms();
   renderFriends();
   renderChats();
   renderManageList();
@@ -689,11 +631,9 @@ async function removeFriend(friendId) {
     .delete()
     .eq('user_id', currentUserId)
     .eq('friend_id', friendId);
-
-  // 즉시 로컬 목록에서도 제거
-  friendsList = friendsList.filter(f => f.id !== friendId);
+  
+  await loadFriends();
   renderFriends();
-  renderManageList();
   showToast("친구 삭제", "친구 목록에서 제거되었습니다.", "#ff4757");
 }
 
