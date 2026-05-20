@@ -917,3 +917,12 @@ window.closeRoomSearch = closeRoomSearch;
 window.searchRoomMessages = searchRoomMessages;
 window.quickAddFriend = quickAddFriend;
 window.removeFriend = removeFriend;
+// 이미 있는 등록 코드에 아래 함수들 추가
+window.openManageModal = openManageModal;
+window.closeManageModal = closeManageModal;
+window.addNewFriendWithVerify = addNewFriendWithVerify;
+window.toggleSearchBar = toggleSearchBar;
+window.filterFriends = filterFriends;
+window.clearSearch = clearSearch;
+window.removeFriend = removeFriend;
+window.quickAddFriend = quickAddFriend;
