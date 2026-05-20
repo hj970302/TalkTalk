@@ -9,6 +9,9 @@ const SUPABASE_URL = 'https://yrndqghsdtxoajgxvqrv.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_4cscglZLxAb2-_IZ2vSouQ_IWCWmNDM';
 // ============================================================
 
+// Supabase 클라이언트 초기화
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 /* ==========================================================================
    전역 상태 변수
    ========================================================================== */
