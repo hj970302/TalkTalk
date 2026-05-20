@@ -168,10 +168,13 @@ async function loadFriends() {
 async function loadChatRooms() {
   const { data: rooms } = await supabaseClient
     .from('chat_room_members')
-    .select('room_id, chat_rooms(*)')
+    .select('room_id, chat_rooms(*), user_id')
     .eq('user_id', currentUserId);
   
-  chatRoomsList = rooms?.map(r => r.chat_rooms) || [];
+  chatRoomsList = rooms?.map(r => ({
+    ...r.chat_rooms,
+    members: rooms.filter(m => m.room_id === r.room_id).map(m => m.user_id)
+  })) || [];
 }
 
 function syncMyProfileDOM() {
@@ -486,9 +489,43 @@ async function renderChats() {
 /* ==========================================================================
    채팅방 열기
    ========================================================================== */
-async function openRoomFromData(roomId) {
-  const room = chatRoomsList.find(r => r.id === roomId);
-  if (!room) return;
+async function openRoomFromData(targetId) {
+  // targetId는 상대방의 profile ID
+  let room = chatRoomsList.find(r => 
+    !r.is_group && r.members?.includes(targetId)
+  );
+  
+  // 채팅방이 없으면 새로 생성
+  if (!room) {
+    const friend = friendsList.find(f => f.id === targetId);
+    if (!friend) {
+      showToast("오류", "친구 정보를 찾을 수 없습니다.", "#ff4757");
+      return;
+    }
+    
+    // 새 채팅방 생성
+    const { data: newRoom, error: roomError } = await supabaseClient
+      .from('chat_rooms')
+      .insert({ name: friend.name, is_group: false, created_by: currentUserId })
+      .select()
+      .single();
+    
+    if (roomError) {
+      console.error("방 생성 오류:", roomError);
+      showToast("오류", "채팅방을 만들 수 없습니다.", "#ff4757");
+      return;
+    }
+    
+    // 채팅방 멤버 추가
+    await supabaseClient.from('chat_room_members').insert([
+      { room_id: newRoom.id, user_id: currentUserId },
+      { room_id: newRoom.id, user_id: targetId }
+    ]);
+    
+    newRoom.members = [currentUserId, targetId];
+    chatRoomsList.push(newRoom);
+    room = newRoom;
+  }
   
   currentRoom = room;
   roomOpen = true;
@@ -498,30 +535,30 @@ async function openRoomFromData(roomId) {
   document.getElementById('screen-room').classList.add('active');
   document.getElementById('tab-bar').style.display = 'none';
   
+  // 실시간 구독 설정
   if (messagesSubscription) {
     supabaseClient.removeChannel(messagesSubscription);
   }
   
   messagesSubscription = supabaseClient
-    .channel(`room-${roomId}`)
+    .channel(`room-${room.id}`)
     .on('postgres_changes', { 
       event: 'INSERT', 
       schema: 'public', 
       table: 'messages',
-      filter: `room_id=eq.${roomId}`
+      filter: `room_id=eq.${room.id}`
     }, (payload) => {
-      if (!roomOpen || currentRoom.id !== roomId) {
+      if (!roomOpen || currentRoom.id !== room.id) {
         const sender = friendsList.find(f => f.id === payload.new.sender_id);
-        showChatNotification(sender?.name || '누군가', payload.new.text || '사진', sender?.avatar);
+        showChatNotification(sender?.name || '누군가', payload.new.content || '사진', sender?.avatar);
       } else {
         appendMessageToUI(payload.new);
       }
     })
     .subscribe();
   
-  await loadMessages(roomId);
+  await loadMessages(room.id);
 }
-
 async function loadMessages(roomId) {
   const { data: messages } = await supabaseClient
     .from('messages')
