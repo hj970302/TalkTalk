@@ -10,7 +10,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // ============================================================
 
 // Supabase 클라이언트 초기화
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ==========================================================================
    전역 상태 변수
@@ -109,7 +109,7 @@ async function initApp() {
   
   if (savedSession) {
     try {
-      const { data: { user }, error } = await supabase.auth.getUser(savedSession);
+      const { data: { user }, error } = await supabaseClient.auth.getUser(savedSession);
       if (!error && user) {
         currentUserId = user.id;
         await loadUserData(user.id);
@@ -204,7 +204,7 @@ async function handleRegister() {
   const name = document.getElementById('reg-name').value.trim();
   if (!id || !pw || !name) { alert("모든 빈칸을 입력해주세요."); return; }
   
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await supabaseClient.auth.signUp({
     email: `${id}@talktalk.local`,
     password: pw,
     options: {
@@ -214,7 +214,7 @@ async function handleRegister() {
   
   if (error) { alert("회원가입 실패: " + error.message); return; }
   
-  await supabase.from('profiles').insert({
+  await supabaseClient.from('profiles').insert({
     id: data.user.id,
     username: id,
     name: name,
@@ -239,7 +239,7 @@ async function handleLogin() {
   const pw = document.getElementById('login-pw').value.trim();
   if (!id || !pw) { alert("아이디와 비밀번호를 모두 입력하세요."); return; }
   
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
     email: `${id}@talktalk.local`,
     password: pw
   });
@@ -259,7 +259,7 @@ async function handleLogin() {
 }
 
 async function handleLogout() {
-  await supabase.auth.signOut();
+  await supabaseClient.auth.signOut();
   localStorage.removeItem('talktalk_session');
   currentUserId = null;
   currentUserProfile = null;
@@ -385,7 +385,7 @@ async function openRoomFromData(roomId) {
   document.getElementById('tab-bar').style.display = 'none';
   
   if (messagesSubscription) {
-    supabase.removeChannel(messagesSubscription);
+    supabaseClient.removeChannel(messagesSubscription);
   }
   
   messagesSubscription = supabase
@@ -464,7 +464,7 @@ async function sendMsg() {
   if (!text || !currentRoom.id) return;
   if (input) input.value = '';
   
-  await supabase.from('messages').insert({
+  await supabaseClient.from('messages').insert({
     room_id: currentRoom.id,
     sender_id: currentUserId,
     text: text,
@@ -486,7 +486,7 @@ async function handleBubbleDelete(type) {
   if (!selectedMessageId) return;
   
   if (type === 'all') {
-    await supabase.from('messages')
+    await supabaseClient.from('messages')
       .update({ deleted_for_all: true })
       .eq('id', selectedMessageId)
       .eq('sender_id', currentUserId);
@@ -536,19 +536,19 @@ async function addNewFriendWithVerify() {
   
   if (friendsList.some(f => f.id === profile.id)) { alert("이미 친구입니다."); return; }
   
-  await supabase.from('friendships').insert({
+  await supabaseClient.from('friendships').insert({
     user_id: currentUserId,
     friend_id: profile.id,
     status: 'accepted'
   });
   
-  const { data: room } = await supabase.from('chat_rooms').insert({
+  const { data: room } = await supabaseClient.from('chat_rooms').insert({
     name: profile.name,
     is_group: false,
     created_by: currentUserId
   }).select().single();
   
-  await supabase.from('chat_room_members').insert([
+  await supabaseClient.from('chat_room_members').insert([
     { room_id: room.id, user_id: currentUserId },
     { room_id: room.id, user_id: profile.id }
   ]);
@@ -563,7 +563,7 @@ async function addNewFriendWithVerify() {
 }
 
 async function removeFriend(friendId) {
-  await supabase.from('friendships')
+  await supabaseClient.from('friendships')
     .delete()
     .eq('user_id', currentUserId)
     .eq('friend_id', friendId);
@@ -624,7 +624,7 @@ async function handleProfileImageUpload(inputElement, type) {
   const reader = new FileReader();
   reader.onload = async function(e) {
     const base64 = e.target.result;
-    await supabase.from('profiles')
+    await supabaseClient.from('profiles')
       .update({ avatar: base64 })
       .eq('id', currentUserId);
     
@@ -685,7 +685,7 @@ function switchTab(tab) {
 function closeRoom() {
   roomOpen = false;
   if (messagesSubscription) {
-    supabase.removeChannel(messagesSubscription);
+    supabaseClient.removeChannel(messagesSubscription);
     messagesSubscription = null;
   }
   document.getElementById('tab-bar').style.display = 'flex';
