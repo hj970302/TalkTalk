@@ -20,21 +20,20 @@
     <div class="auth-card" id="login-card">
       <h3>로그인</h3>
       <div class="auth-group">
-  <div class="auth-input-wrapper"><i class="ti ti-user-plus"></i><input type="text" id="reg-id" placeholder="사용할 아이디"></div>
-  <div class="auth-input-wrapper"><i class="ti ti-lock"></i><input type="password" id="reg-pw" placeholder="비밀번호"></div>
-  <div class="auth-input-wrapper"><i class="ti ti-lock"></i><input type="password" id="reg-pw-confirm" placeholder="비밀번호 확인"></div>
-  <div class="auth-input-wrapper"><i class="ti ti-id"></i><input type="text" id="reg-name" placeholder="표시될 이름(닉네임)"></div>
-</div>
+        <div class="auth-input-wrapper"><i class="ti ti-user"></i><input type="text" id="login-id" placeholder="아이디 입력"></div>
+        <div class="auth-input-wrapper"><i class="ti ti-lock"></i><input type="password" id="login-pw" placeholder="비밀번호 입력"></div>
+      </div>
       <button class="btn-auth-primary" onclick="handleLogin()">시작하기</button>
       <div class="auth-toggle-link" onclick="toggleAuthForm('register')">새로운 아이디 만들기</div>
     </div>
     <div class="auth-card" id="register-card">
       <h3>아이디 생성</h3>
       <div class="auth-group">
-        <div class="auth-input-wrapper"><i class="ti ti-user-plus"></i><input type="text" id="reg-id" placeholder="사용할 아이디"></div>
-        <div class="auth-input-wrapper"><i class="ti ti-lock"></i><input type="password" id="reg-pw" placeholder="비밀번호"></div>
-        <div class="auth-input-wrapper"><i class="ti ti-id"></i><input type="text" id="reg-name" placeholder="표시될 이름(닉네임)"></div>
-      </div>
+  <div class="auth-input-wrapper"><i class="ti ti-user-plus"></i><input type="text" id="reg-id" placeholder="사용할 아이디"></div>
+  <div class="auth-input-wrapper"><i class="ti ti-lock"></i><input type="password" id="reg-pw" placeholder="비밀번호"></div>
+  <div class="auth-input-wrapper"><i class="ti ti-lock"></i><input type="password" id="reg-pw-confirm" placeholder="비밀번호 확인"></div>
+  <div class="auth-input-wrapper"><i class="ti ti-id"></i><input type="text" id="reg-name" placeholder="표시될 이름(닉네임)"></div>
+</div>
       <button class="btn-auth-primary" onclick="handleRegister()">생성 완료 및 로그인</button>
       <div class="auth-toggle-link" onclick="toggleAuthForm('login')">이미 아이디가 있습니다</div>
     </div>
