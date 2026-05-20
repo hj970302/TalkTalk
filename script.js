@@ -1,13 +1,17 @@
+
 /* ==========================================================================
    톡톡 (TalkTalk) - Supabase 실시간 채팅 버전
    ========================================================================== */
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
+// ============================================================
+// 🔥 여기만 본인 값으로 교체하세요! 🔥
+// ============================================================
 const SUPABASE_URL = 'https://yrndqghsdtxoajgxvqrv.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlybmRxZ2hzZHR4b2FqZ3h2cXJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNjM3NTksImV4cCI6MjA5NDgzOTc1OX0.jEjISPblbaz-EFTE63kj8wG85lqWSdr_HAloukwzjnc';
+// ============================================================
 
-const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Supabase 클라이언트 초기화
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ==========================================================================
    전역 상태 변수
@@ -866,63 +870,3 @@ document.getElementById('reg-name')?.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') handleRegister();
 });
 
-// 전역 함수 등록 (HTML onclick에서 접근 가능하도록)
-window.handleLogin = handleLogin;
-window.handleRegister = handleRegister;
-window.toggleAuthForm = toggleAuthForm;
-window.handleLogout = handleLogout;
-window.switchTab = switchTab;
-window.closeRoom = closeRoom;
-window.openProfileCard = openProfileCard;
-window.closeProfileCard = closeProfileCard;
-window.toggleFavoriteAction = toggleFavoriteAction;
-window.openTextEditModal = openTextEditModal;
-window.closeTextEditModal = closeTextEditModal;
-window.saveTextEditAction = saveTextEditAction;
-window.openManageModal = openManageModal;
-window.closeManageModal = closeManageModal;
-window.addNewFriendWithVerify = addNewFriendWithVerify;
-window.openGroupCreateModal = openGroupCreateModal;
-window.closeGroupCreateModal = closeGroupCreateModal;
-window.confirmCreateGroupChat = confirmCreateGroupChat;
-window.openInviteModal = openInviteModal;
-window.closeInviteModal = closeInviteModal;
-window.confirmInviteMembers = confirmInviteMembers;
-window.openAdminBanModal = openAdminBanModal;
-window.closeAdminBanModal = closeAdminBanModal;
-window.toggleChatSearch = toggleChatSearch;
-window.filterChats = filterChats;
-window.clearChatSearch = clearChatSearch;
-window.toggleSearchBar = toggleSearchBar;
-window.filterFriends = filterFriends;
-window.clearSearch = clearSearch;
-window.toggleEmoticonDrawer = toggleEmoticonDrawer;
-window.selectEmot = selectEmot;
-window.triggerClip = triggerClip;
-window.handleProfileImageUpload = handleProfileImageUpload;
-window.openImageViewer = openImageViewer;
-window.closeImageViewer = closeImageViewer;
-window.toggleViewerDropdown = toggleViewerDropdown;
-window.rotateViewerImage = rotateViewerImage;
-window.flipViewerImage = flipViewerImage;
-window.saveViewerImage = saveViewerImage;
-window.deleteViewerImage = deleteViewerImage;
-window.handleBubbleDelete = handleBubbleDelete;
-window.chatSwipeAction = chatSwipeAction;
-window.handleAvatarTouch = handleAvatarTouch;
-window.triggerProfileUpload = triggerProfileUpload;
-window.clearProfileBackground = clearProfileBackground;
-window.toggleRoomSearch = toggleRoomSearch;
-window.closeRoomSearch = closeRoomSearch;
-window.searchRoomMessages = searchRoomMessages;
-window.quickAddFriend = quickAddFriend;
-window.removeFriend = removeFriend;
-// 이미 있는 등록 코드에 아래 함수들 추가
-window.openManageModal = openManageModal;
-window.closeManageModal = closeManageModal;
-window.addNewFriendWithVerify = addNewFriendWithVerify;
-window.toggleSearchBar = toggleSearchBar;
-window.filterFriends = filterFriends;
-window.clearSearch = clearSearch;
-window.removeFriend = removeFriend;
-window.quickAddFriend = quickAddFriend;
