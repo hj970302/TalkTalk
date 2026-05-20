@@ -214,7 +214,6 @@ async function handleRegister() {
   
   if (error) { alert("회원가입 실패: " + error.message); return; }
   
-  // 프로필 생성
   await supabase.from('profiles').insert({
     id: data.user.id,
     username: id,
@@ -334,7 +333,6 @@ async function renderChats() {
   
   container.innerHTML = '';
   for (const room of filtered) {
-    // 마지막 메시지 가져오기
     const { data: lastMsg } = await supabase
       .from('messages')
       .select('text, is_image, created_at')
@@ -386,7 +384,6 @@ async function openRoomFromData(roomId) {
   document.getElementById('screen-room').classList.add('active');
   document.getElementById('tab-bar').style.display = 'none';
   
-  // 실시간 메시지 구독 설정
   if (messagesSubscription) {
     supabase.removeChannel(messagesSubscription);
   }
@@ -400,7 +397,6 @@ async function openRoomFromData(roomId) {
       filter: `room_id=eq.${roomId}`
     }, (payload) => {
       if (!roomOpen || currentRoom.id !== roomId) {
-        // 알림 표시
         const sender = friendsList.find(f => f.id === payload.new.sender_id);
         showChatNotification(sender?.name || '누군가', payload.new.text || '사진', sender?.avatar);
       } else {
@@ -409,7 +405,6 @@ async function openRoomFromData(roomId) {
     })
     .subscribe();
   
-  // 메시지 불러오기
   await loadMessages(roomId);
 }
 
@@ -463,9 +458,6 @@ function appendMessageToUI(msg) {
   container.scrollTop = container.scrollHeight;
 }
 
-/* ==========================================================================
-   메시지 전송
-   ========================================================================== */
 async function sendMsg() {
   const input = document.getElementById('msg-input');
   const text = input?.value.trim();
@@ -480,9 +472,6 @@ async function sendMsg() {
   });
 }
 
-/* ==========================================================================
-   말풍선 메뉴
-   ========================================================================== */
 function triggerBubbleMenu(e, messageId) {
   selectedMessageId = messageId;
   const menu = document.getElementById('bubble-context-menu');
@@ -502,7 +491,6 @@ async function handleBubbleDelete(type) {
       .eq('id', selectedMessageId)
       .eq('sender_id', currentUserId);
   } else {
-    // "나에게만 삭제"는 로컬에서만 처리 (DB에는 표시 안 함)
     showToast("알림", "나에게만 삭제되었습니다.", "#555");
   }
   if (roomOpen && currentRoom.id) {
@@ -510,9 +498,6 @@ async function handleBubbleDelete(type) {
   }
 }
 
-/* ==========================================================================
-   친구 관리
-   ========================================================================== */
 function openManageModal() {
   const modal = document.getElementById('manage-modal');
   if (modal) modal.classList.add('active');
@@ -549,7 +534,6 @@ async function addNewFriendWithVerify() {
   
   if (!profile) { alert("존재하지 않는 아이디입니다."); return; }
   
-  // 이미 친구인지 확인
   if (friendsList.some(f => f.id === profile.id)) { alert("이미 친구입니다."); return; }
   
   await supabase.from('friendships').insert({
@@ -558,7 +542,6 @@ async function addNewFriendWithVerify() {
     status: 'accepted'
   });
   
-  // 1:1 채팅방 생성
   const { data: room } = await supabase.from('chat_rooms').insert({
     name: profile.name,
     is_group: false,
@@ -590,9 +573,6 @@ async function removeFriend(friendId) {
   showToast("친구 삭제", "친구 목록에서 제거되었습니다.", "#ff4757");
 }
 
-/* ==========================================================================
-   프로필 카드
-   ========================================================================== */
 async function openProfileCard(id) {
   profileTargetId = id;
   const cardOverlay = document.getElementById('profile-card');
@@ -657,9 +637,6 @@ async function handleProfileImageUpload(inputElement, type) {
   inputElement.value = "";
 }
 
-/* ==========================================================================
-   이미지 뷰어 (기존 유지)
-   ========================================================================== */
 function openImageViewer(srcUrl, msgId = null) {
   currentDegree = 0; flipX = 1; flipY = 1;
   viewerContextMessageId = msgId;
@@ -690,9 +667,6 @@ function saveViewerImage() {
   a.click();
 }
 
-/* ==========================================================================
-   이모티콘 & UI
-   ========================================================================== */
 function toggleEmoticonDrawer() {
   document.getElementById('emoticon-drawer')?.classList.toggle('active');
 }
@@ -751,8 +725,22 @@ function chatSwipeAction(action, roomId) {
   showToast("알림", `${action} 기능 준비 중입니다.`, "#888");
 }
 
-// ============================================================
-// 페이지 로드 후 이벤트 리스너 등록
-// ============================================================
 document.getElementById('send-btn')?.addEventListener('click', sendMsg);
 document.getElementById('msg-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
+
+// 엔터키로 로그인
+document.getElementById('login-id')?.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') handleLogin();
+});
+document.getElementById('login-pw')?.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') handleLogin();
+});
+document.getElementById('reg-id')?.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') handleRegister();
+});
+document.getElementById('reg-pw')?.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') handleRegister();
+});
+document.getElementById('reg-name')?.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') handleRegister();
+});
