@@ -109,8 +109,9 @@ async function initApp() {
   
   if (savedSession) {
     try {
-      const { data: { user }, error } = await supabaseClient.auth.getUser(savedSession);
-      if (!error && user) {
+      const { data: { session }, error } = await supabaseClient.auth.getSession();
+      if (!error && session?.user) {
+        const user = session.user;
         currentUserId = user.id;
         await loadUserData(user.id);
         if (authScreen) authScreen.style.display = 'none';
@@ -129,7 +130,7 @@ async function initApp() {
 }
 
 async function loadUserData(userId) {
-  const { data: profile } = await supabase
+  const { data: profile } = await supabaseClient
     .from('profiles')
     .select('*')
     .eq('id', userId)
@@ -148,7 +149,7 @@ async function loadUserData(userId) {
 }
 
 async function loadFriends() {
-  const { data: friendships } = await supabase
+  const { data: friendships } = await supabaseClient
     .from('friendships')
     .select('friend_id, profiles:friend_id(*)')
     .eq('user_id', currentUserId)
@@ -161,7 +162,7 @@ async function loadFriends() {
 }
 
 async function loadChatRooms() {
-  const { data: rooms } = await supabase
+  const { data: rooms } = await supabaseClient
     .from('chat_room_members')
     .select('room_id, chat_rooms(*)')
     .eq('user_id', currentUserId);
@@ -396,7 +397,7 @@ async function renderChats() {
   
   container.innerHTML = '';
   for (const room of filtered) {
-    const { data: lastMsg } = await supabase
+    const { data: lastMsg } = await supabaseClient
       .from('messages')
       .select('text, is_image, created_at')
       .eq('room_id', room.id)
@@ -451,7 +452,7 @@ async function openRoomFromData(roomId) {
     supabaseClient.removeChannel(messagesSubscription);
   }
   
-  messagesSubscription = supabase
+  messagesSubscription = supabaseClient
     .channel(`room-${roomId}`)
     .on('postgres_changes', { 
       event: 'INSERT', 
@@ -472,7 +473,7 @@ async function openRoomFromData(roomId) {
 }
 
 async function loadMessages(roomId) {
-  const { data: messages } = await supabase
+  const { data: messages } = await supabaseClient
     .from('messages')
     .select('*')
     .eq('room_id', roomId)
@@ -589,7 +590,7 @@ async function addNewFriendWithVerify() {
   if (!username) return;
   if (username === currentUserProfile?.username) { alert("자기 자신은 추가할 수 없습니다."); return; }
   
-  const { data: profile } = await supabase
+  const { data: profile } = await supabaseClient
     .from('profiles')
     .select('id, name')
     .eq('username', username)
