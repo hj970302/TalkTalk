@@ -377,24 +377,14 @@ function renderFriends() {
   container.innerHTML = html;
 }
 
-async function renderRecommendSection() {
-  // 나를 친구 추가한 사람 찾기
-  const { data: friendRequests } = await supabaseClient
-    .from('friendships')
-    .select('user_id, profiles:user_id(*)')
-    .eq('friend_id', currentUserId)
-    .eq('status', 'accepted');
-  
+function renderRecommendSection() {
+  if (!window._allProfiles || window._allProfiles.length === 0) return '';
   const friendIds = new Set(friendsList.map(f => f.id));
-  const recommendUsers = (friendRequests || [])
-    .map(req => req.profiles)
-    .filter(p => p && p.id !== currentUserId && !friendIds.has(p.id));
-  
-  if (recommendUsers.length === 0) return '';
-  
-  let html = `<div class="normal-section"><div class="section-title" style="color:#888;">나를 추가한 친구 ${recommendUsers.length}</div>`;
-  html += recommendUsers.map(p => `
-    <div class="friend-item">
+  const recommends = window._allProfiles.filter(p => p.id !== currentUserId && !friendIds.has(p.id));
+  if (recommends.length === 0) return '';
+  let html = `<div class="normal-section"><div class="section-title" style="color:#888;">추천 친구 ${recommends.length}</div>`;
+  html += recommends.map(p => `
+    <div class="friend-item" style="opacity:0.75;">
       <div class="avatar-sm avatar-base">${p.avatar ? `<img src="${p.avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : '<i class="ti ti-user"></i>'}</div>
       <div style="flex:1;"><div class="fi-name">${p.name}</div><div class="fi-status">${p.status || '안녕하세요!'}</div></div>
       <button onclick="quickAddFriend('${p.id}','${p.username}','${p.name}')" style="background:#fee500;border:none;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;">추가</button>
@@ -562,12 +552,12 @@ function appendMessageToUI(msg) {
   
   const bubble = document.createElement('div');
   bubble.className = `bubble ${isMine ? 'mine' : 'other'}`;
-  if (msg.type === 'image' && msg.image_url) {
+  if (msg.is_image && msg.image_url) {
     bubble.classList.add('image-bubble');
     bubble.innerHTML = `<img src="${msg.image_url}" alt="이미지" style="max-width:200px; max-height:200px;">`;
     bubble.onclick = () => openImageViewer(msg.image_url, msg.id);
   } else {
-    bubble.textContent = msg.content || '사진';
+    bubble.textContent = msg.text || '사진';
     bubble.onclick = (e) => { e.stopPropagation(); triggerBubbleMenu(e, msg.id); };
   }
   
@@ -591,8 +581,8 @@ async function sendMsg() {
   await supabaseClient.from('messages').insert({
     room_id: currentRoom.id,
     sender_id: currentUserId,
-    content: text,      // text → content
-    type: 'text'        // is_image 대신 type
+    text: text,
+    is_image: false
   });
 }
 
