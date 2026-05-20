@@ -5,12 +5,12 @@
 // ============================================================
 // 🔥 여기만 본인 값으로 교체하세요! 🔥
 // ============================================================
-const SUPABASE_URL = 'https://yrndqghsdtxoajgxvqrv.supabaseClient.co';
+const SUPABASE_URL = 'https://yrndqghsdtxoajgxvqrv.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlybmRxZ2hzZHR4b2FqZ3h2cXJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNjM3NTksImV4cCI6MjA5NDgzOTc1OX0.jEjISPblbaz-EFTE63kj8wG85lqWSdr_HAloukwzjnc';
 // ============================================================
 
 // Supabase 클라이언트 초기화
-const supabaseClient = window.supabaseClient.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /* ==========================================================================
    전역 상태 변수
