@@ -621,7 +621,7 @@ async function addNewFriendWithVerify() {
   await loadChatRooms();
   renderFriends();
   renderChats();
-  closeManageModal();
+  renderManageList();
   if (input) input.value = '';
   showToast("친구 추가", `${profile.name}님과 친구가 되었습니다!`, "#2ed573");
 }
