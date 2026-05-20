@@ -615,12 +615,21 @@ async function sendMsg() {
   if (!text || !currentRoom.id) return;
   if (input) input.value = '';
   
-  await supabaseClient.from('messages').insert({
+  console.log("전송 시도:", { room_id: currentRoom.id, sender_id: currentUserId, content: text });
+  
+  const { data, error } = await supabaseClient.from('messages').insert({
     room_id: currentRoom.id,
     sender_id: currentUserId,
-    text: text,
-    is_image: false
+    content: text,
+    type: 'text'
   });
+  
+  if (error) {
+    console.error("메시지 전송 오류:", error);
+    showToast("오류", "메시지를 보낼 수 없습니다.", "#ff4757");
+  } else {
+    console.log("전송 성공:", data);
+  }
 }
 
 function triggerBubbleMenu(e, messageId) {
