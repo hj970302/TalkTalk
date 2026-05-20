@@ -202,21 +202,35 @@ async function handleRegister() {
   const id = document.getElementById('reg-id').value.trim();
   const pw = document.getElementById('reg-pw').value.trim();
   const name = document.getElementById('reg-name').value.trim();
-  if (!id || !pw || !name) { alert("모든 빈칸을 입력해주세요."); return; }
+  if (!id || !pw || !name) { 
+    alert("모든 빈칸을 입력해주세요."); 
+    return; 
+  }
+  
+  if (!id.includes('@')) {
+    alert("유효한 이메일 주소를 입력해주세요.");
+    return;
+  }
   
   const { data, error } = await supabaseClient.auth.signUp({
     email: id,
     password: pw,
     options: {
-      data: { username: id, name: name }
+      data: { 
+        username: id.split('@')[0], 
+        name: name 
+      }
     }
   });
   
-  if (error) { alert("회원가입 실패: " + error.message); return; }
+  if (error) { 
+    alert("회원가입에 실패했습니다. 다시 시도해주세요.");  // 👈 여기!
+    return; 
+  }
   
   await supabaseClient.from('profiles').insert({
     id: data.user.id,
-    username: id,
+    username: id.split('@')[0],
     name: name,
     status: '톡톡 가입을 환영합니다!'
   });
@@ -237,14 +251,20 @@ async function handleRegister() {
 async function handleLogin() {
   const id = document.getElementById('login-id').value.trim();
   const pw = document.getElementById('login-pw').value.trim();
-  if (!id || !pw) { alert("아이디와 비밀번호를 모두 입력하세요."); return; }
+  if (!id || !pw) { 
+    alert("아이디와 비밀번호를 모두 입력해주세요."); 
+    return; 
+  }
   
   const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email: `${id}@talktalk.local`,
+    email: id,
     password: pw
   });
   
-  if (error) { alert("로그인 실패: " + error.message); return; }
+  if (error) { 
+    alert("아이디 또는 비밀번호가 일치하지 않습니다.");  // 👈 여기!
+    return; 
+  }
   
   localStorage.setItem('talktalk_session', data.user.id);
   currentUserId = data.user.id;
