@@ -589,12 +589,13 @@ function appendMessageToUI(msg) {
   
   const bubble = document.createElement('div');
   bubble.className = `bubble ${isMine ? 'mine' : 'other'}`;
-  if (msg.is_image && msg.image_url) {
+  
+  if (msg.type === 'image' && msg.image_url) {
     bubble.classList.add('image-bubble');
-    bubble.innerHTML = `<img src="${msg.image_url}" alt="이미지" style="max-width:200px; max-height:200px;">`;
+    bubble.innerHTML = `<img src="${msg.image_url}" alt="이미지" style="max-width:200px; max-height:200px; border-radius:8px;">`;
     bubble.onclick = () => openImageViewer(msg.image_url, msg.id);
   } else {
-    bubble.textContent = msg.text || '사진';
+    bubble.textContent = msg.content || '사진';
     bubble.onclick = (e) => { e.stopPropagation(); triggerBubbleMenu(e, msg.id); };
   }
   
@@ -607,6 +608,41 @@ function appendMessageToUI(msg) {
   row.appendChild(bwrap);
   container.appendChild(row);
   container.scrollTop = container.scrollHeight;
+}
+async function handleClipFile(inputElement) {
+  const file = inputElement.files[0];
+  if (!file) return;
+  
+  if (!file.type.startsWith('image/')) {
+    showToast("오류", "이미지 파일만 첨부 가능합니다.", "#ff4757");
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const base64Img = e.target.result;
+    
+    const { data, error } = await supabaseClient.from('messages').insert({
+      room_id: currentRoom.id,
+      sender_id: currentUserId,
+      image_url: base64Img,
+      type: 'image'
+    });
+    
+    if (error) {
+      console.error("이미지 전송 오류:", error);
+      showToast("오류", "이미지를 보낼 수 없습니다.", "#ff4757");
+    } else {
+      // 메시지 목록에 추가 (새로고침 없이)
+      if (roomOpen && currentRoom.id === data[0].room_id) {
+        appendMessageToUI(data[0]);
+      }
+      // 채팅방 목록 업데이트
+      renderChats();
+    }
+  };
+  reader.readAsDataURL(file);
+  inputElement.value = "";
 }
 
 async function sendMsg() {
