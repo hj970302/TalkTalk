@@ -577,15 +577,8 @@ async function loadMessages(roomId) {
 }
 
 function appendMessageToUI(msg) {
-  // ...
-  if (msg.type === 'image' && msg.image_url) {
-    bubble.classList.add('image-bubble');
-    bubble.innerHTML = `<img src="${msg.image_url}" ...>`;
-  } else {
-    bubble.textContent = msg.content || '사진';  // text → content
-  }
-  // ...
-}
+  const container = document.getElementById('room-messages');
+  if (!container) return;
   
   const isMine = msg.sender_id === currentUserId;
   const row = document.createElement('div');
@@ -625,8 +618,8 @@ async function sendMsg() {
   await supabaseClient.from('messages').insert({
     room_id: currentRoom.id,
     sender_id: currentUserId,
-    content: text,      // text → content
-    type: 'text'        // is_image 대신 type
+    text: text,
+    is_image: false
   });
 }
 
