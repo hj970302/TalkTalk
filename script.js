@@ -610,25 +610,71 @@ async function chatSwipeAction(action, roomId) {
     const isSecret = room.is_secret || false;
     
     if (isSecret) {
-      // 🔒 비밀 채팅방: 모든 메시지 deleted_for_all = true
+      // 🔒 비밀 채팅방: 한 명이라도 나가면 모두 퇴장 + 모든 내용 삭제
+      
+      // 1. 모든 메시지 deleted_for_all = true (모두에게 영구 삭제)
       await supabaseClient
         .from('messages')
         .update({ deleted_for_all: true })
         .eq('room_id', roomId);
       
-      // 1. 채팅방 멤버 삭제
+      // 2. 모든 멤버 조회 (상대방에게 알림 보내기 위함)
+      const { data: members } = await supabaseClient
+        .from('chat_room_members')
+        .select('user_id')
+        .eq('room_id', roomId);
+      
+      // 3. 상대방들에게 알림 (선택사항 - 실시간 구독으로도 처리 가능)
+      const otherMembers = members?.filter(m => m.user_id !== currentUserId) || [];
+      
+      for (const member of otherMembers) {
+        // 상대방의 실시간 구독에서 감지할 수 있도록 
+        // 별도의 알림 메시지 전송 (선택)
+        console.log(`상대방 ${member.user_id} 강제 퇴장 처리됨`);
+        
+        // 또는 Push 알림 전송
+        try {
+          const { data: profile } = await supabaseClient
+            .from('profiles')
+            .select('onesignal_player_id')
+            .eq('id', member.user_id)
+            .single();
+          
+          if (profile?.onesignal_player_id) {
+            await fetch('https://yrndqghsdtxoajgxvqrv.supabase.co/functions/v1/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                player_ids: [profile.onesignal_player_id],
+                title: '🔒 비밀 채팅방',
+                message: `'${room.name}' 방이 삭제되었습니다.`,
+                url: window.location.href
+              })
+            });
+          }
+        } catch(e) {
+          console.error('알림 전송 실패:', e);
+        }
+      }
+      
+      // 4. 모든 멤버 삭제
       await supabaseClient
         .from('chat_room_members')
         .delete()
         .eq('room_id', roomId);
       
-      // 2. 채팅방 삭제
+      // 5. 채팅방 삭제
       await supabaseClient
         .from('chat_rooms')
         .delete()
         .eq('id', roomId);
       
+      // 6. 현재 사용자의 채팅방 목록에서 제거 (UI 갱신)
+      chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
+      renderChats();
+      
       showToast("채팅방", "비밀 채팅방이 삭제되었습니다.", "#ff4757");
+      
     } else {
       // 일반 채팅방: 내 화면에서만 메시지 숨김
       const { data: messages } = await supabaseClient
@@ -663,11 +709,10 @@ async function chatSwipeAction(action, roomId) {
         await supabaseClient.from('chat_rooms').delete().eq('id', roomId);
       }
       
+      chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
       showToast("채팅방", "채팅방에서 나갔습니다. 대화 내용이 삭제되었습니다.", "#ff4757");
+      renderChats();
     }
-    
-    chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
-    renderChats();
   }
 }
 
@@ -675,13 +720,14 @@ async function chatSwipeAction(action, roomId) {
    채팅방 열기
    ============================================================ */
 async function openRoomWithFriend(friendId) {
-  // 1. DB에서 직접 공통 채팅방 찾기 (가장 정확함)
-  const { data: myRooms } = await supabaseClient
+  // 1. 이미 존재하는 1:1 채팅방 찾기 (중복 방지 - 더 정확하게)
+  const { data: existingRoom } = await supabaseClient
     .from('chat_room_members')
-    .select('room_id')
-    .eq('user_id', currentUserId);
-
-  const myRoomIds = myRooms?.map(r => r.room_id) || [];
+    .select('room_id, chat_rooms!inner(*)')
+    .eq('user_id', currentUserId)
+    .eq('chat_rooms.is_group', false);
+  
+  const myRoomIds = existingRoom?.map(r => r.room_id) || [];
   
   if (myRoomIds.length > 0) {
     const { data: sharedRooms } = await supabaseClient
@@ -716,13 +762,60 @@ async function openRoomWithFriend(friendId) {
     }
   }
   
-  // 2. 정말 없으면 새로 생성
+  // 2. 정말 없으면 새로 생성 (중복 생성 방지를 위한 최종 확인)
   const friend = friendsList.find(f => f.id === friendId);
   if (!friend) { 
     showToast("오류","친구 정보를 찾을 수 없습니다.","#ff4757"); 
     return; 
   }
   
+  // ✅ 추가: 같은 이름의 1:1 채팅방이 이미 존재하는지 최종 확인
+  const { data: duplicateCheck } = await supabaseClient
+    .from('chat_rooms')
+    .select('id')
+    .eq('name', friend.name)
+    .eq('is_group', false)
+    .maybeSingle();
+  
+  if (duplicateCheck) {
+    // 이미 있는 방이면 멤버인지 확인 후 추가
+    const { data: isMember } = await supabaseClient
+      .from('chat_room_members')
+      .select('user_id')
+      .eq('room_id', duplicateCheck.id)
+      .eq('user_id', currentUserId)
+      .maybeSingle();
+    
+    if (!isMember) {
+      await supabaseClient.from('chat_room_members').insert([
+        { room_id: duplicateCheck.id, user_id: currentUserId },
+        { room_id: duplicateCheck.id, user_id: friendId }
+      ]);
+    }
+    
+    // 방 정보 가져오기
+    const { data: roomData } = await supabaseClient
+      .from('chat_rooms')
+      .select('*')
+      .eq('id', duplicateCheck.id)
+      .single();
+    
+    if (roomData) {
+      const { data: members } = await supabaseClient
+        .from('chat_room_members')
+        .select('user_id')
+        .eq('room_id', roomData.id);
+      roomData.members = members?.map(m => m.user_id) || [];
+      
+      if (!chatRoomsList.find(r => r.id === roomData.id)) {
+        chatRoomsList.push(roomData);
+      }
+      openRoomFromData(roomData.id);
+      return;
+    }
+  }
+  
+  // 3. 진짜 없으면 새로 생성
   const { data: newRoom, error } = await supabaseClient
     .from('chat_rooms')
     .insert({ name: friend.name, is_group: false, created_by: currentUserId })
