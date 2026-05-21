@@ -608,112 +608,42 @@ async function chatSwipeAction(action, roomId) {
   } else if (action === 'leave') {
     if (!confirm("채팅방에서 나가시겠습니까? 나가면 대화 내용이 삭제됩니다.")) return;
     
-    const isSecret = room.is_secret || false;
+    // 일반 채팅방: 내 화면에서만 메시지 숨김
+    const { data: messages } = await supabaseClient
+      .from('messages')
+      .select('id, deleted_for_me')
+      .eq('room_id', roomId);
     
-    if (isSecret) {
-      // 🔒 비밀 채팅방: 한 명이라도 나가면 모두 퇴장 + 모든 내용 삭제
-      
-      // 1. 모든 메시지 deleted_for_all = true (모두에게 영구 삭제)
-      await supabaseClient
-        .from('messages')
-        .update({ deleted_for_all: true })
-        .eq('room_id', roomId);
-      
-      // 2. 모든 멤버 조회 (상대방에게 알림 보내기 위함)
-      const { data: members } = await supabaseClient
-        .from('chat_room_members')
-        .select('user_id')
-        .eq('room_id', roomId);
-      
-      // 3. 상대방들에게 알림 (선택사항 - 실시간 구독으로도 처리 가능)
-      const otherMembers = members?.filter(m => m.user_id !== currentUserId) || [];
-      
-      for (const member of otherMembers) {
-        // 상대방의 실시간 구독에서 감지할 수 있도록 
-        // 별도의 알림 메시지 전송 (선택)
-        console.log(`상대방 ${member.user_id} 강제 퇴장 처리됨`);
-        
-        // 또는 Push 알림 전송
-        try {
-          const { data: profile } = await supabaseClient
-            .from('profiles')
-            .select('onesignal_player_id')
-            .eq('id', member.user_id)
-            .single();
-          
-          if (profile?.onesignal_player_id) {
-            await fetch('https://yrndqghsdtxoajgxvqrv.supabase.co/functions/v1/send-notification', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                player_ids: [profile.onesignal_player_id],
-                title: '🔒 비밀 채팅방',
-                message: `'${room.name}' 방이 삭제되었습니다.`,
-                url: window.location.href
-              })
-            });
-          }
-        } catch(e) {
-          console.error('알림 전송 실패:', e);
-        }
+    for (const msg of messages || []) {
+      const currentDeleted = msg.deleted_for_me || [];
+      if (!currentDeleted.includes(currentUserId)) {
+        await supabaseClient
+          .from('messages')
+          .update({ deleted_for_me: [...currentDeleted, currentUserId] })
+          .eq('id', msg.id);
       }
-      
-      // 4. 모든 멤버 삭제
-      await supabaseClient
-        .from('chat_room_members')
-        .delete()
-        .eq('room_id', roomId);
-      
-      // 5. 채팅방 삭제
-      await supabaseClient
-        .from('chat_rooms')
-        .delete()
-        .eq('id', roomId);
-      
-      // 6. 현재 사용자의 채팅방 목록에서 제거 (UI 갱신)
-      chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
-      renderChats();
-      
-      showToast("채팅방", "비밀 채팅방이 삭제되었습니다.", "#ff4757");
-      
-    } else {
-      // 일반 채팅방: 내 화면에서만 메시지 숨김
-      const { data: messages } = await supabaseClient
-        .from('messages')
-        .select('id, deleted_for_me')
-        .eq('room_id', roomId);
-      
-      for (const msg of messages || []) {
-        const currentDeleted = msg.deleted_for_me || [];
-        if (!currentDeleted.includes(currentUserId)) {
-          await supabaseClient
-            .from('messages')
-            .update({ deleted_for_me: [...currentDeleted, currentUserId] })
-            .eq('id', msg.id);
-        }
-      }
-      
-      // 채팅방 멤버에서 제거
-      await supabaseClient
-        .from('chat_room_members')
-        .delete()
-        .eq('room_id', roomId)
-        .eq('user_id', currentUserId);
-      
-      // 방에 아무도 없으면 방 자체도 삭제
-      const { count } = await supabaseClient
-        .from('chat_room_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('room_id', roomId);
-      
-      if (count === 0) {
-        await supabaseClient.from('chat_rooms').delete().eq('id', roomId);
-      }
-      
-      chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
-      showToast("채팅방", "채팅방에서 나갔습니다. 대화 내용이 삭제되었습니다.", "#ff4757");
-      renderChats();
     }
+    
+    // 채팅방 멤버에서 제거
+    await supabaseClient
+      .from('chat_room_members')
+      .delete()
+      .eq('room_id', roomId)
+      .eq('user_id', currentUserId);
+    
+    // 방에 아무도 없으면 방 자체도 삭제
+    const { count } = await supabaseClient
+      .from('chat_room_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('room_id', roomId);
+    
+    if (count === 0) {
+      await supabaseClient.from('chat_rooms').delete().eq('id', roomId);
+    }
+    
+    chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
+    showToast("채팅방", "채팅방에서 나갔습니다. 대화 내용이 삭제되었습니다.", "#ff4757");
+    renderChats();
   }
 }
 
@@ -1546,16 +1476,12 @@ async function confirmCreateGroupChat() {
   const checked = [...document.querySelectorAll('#group-member-list input[type=checkbox]:checked')].map(c => c.value);
   if (checked.length === 0) { alert("초대할 친구를 선택하세요."); return; }
   
-  // ✅ 비밀 채팅방 여부 확인
-  const isSecret = document.getElementById('secret-room-checkbox')?.checked || false;
-  
   const { data: room, error } = await supabaseClient
     .from('chat_rooms')
     .insert({ 
       name, 
       is_group: true, 
-      created_by: currentUserId,
-      is_secret: isSecret  // ✅ 추가
+      created_by: currentUserId
     })
     .select()
     .single();
@@ -1570,19 +1496,8 @@ async function confirmCreateGroupChat() {
   renderChats();
   closeGroupCreateModal();
   
-  // ✅ 비밀 채팅방 안내 메시지 전송
-  if (isSecret) {
-    await supabaseClient.from('messages').insert({
-      room_id: room.id,
-      sender_id: currentUserId,
-      content: '🔒 이 방은 비밀 채팅방입니다. 한 명이라도 나가면 모든 내용이 삭제됩니다.',
-      type: 'notice'
-    });
-  }
-  
   showToast("단체채팅", `'${name}' 방이 만들어졌습니다.`, "#5352ed");
 }
-
 /* ============================================================
    단체방 초대
    ============================================================ */
@@ -1705,6 +1620,7 @@ function startGlobalRealtime() {
         });
         await loadChatRooms();
         renderChats();
+        return;
       }
       
       if (roomOpen && currentRoom.id === msg.room_id) return;
@@ -1762,22 +1678,8 @@ function startGlobalRealtime() {
         if (changed) showToast("프로필 변경", `${updatedProfile.name}님의 프로필이 업데이트되었습니다.`, "#5352ed");
       }
     })
-    // ✅ 채팅방 삭제 감지 (비밀 채팅방용)
-    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_rooms' }, (payload) => {
-      const deletedRoomId = payload.old.id;
-      console.log('채팅방 삭제 감지:', deletedRoomId);
-      
-      chatRoomsList = chatRoomsList.filter(r => r.id !== deletedRoomId);
-      renderChats();
-      
-      if (roomOpen && currentRoom.id === deletedRoomId) {
-        closeRoom();
-        showToast("알림", "비밀 채팅방이 삭제되었습니다.", "#ff4757");
-      }
-    })
     .subscribe();
 }
-
 /* ============================================================
    폰트 설정
    ============================================================ */
