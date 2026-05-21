@@ -1,325 +1,703 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>톡톡 (TalkTalk)</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-<div id="app">
+/* ============================================================
+   테마 변수 (화이트 기본)
+   ============================================================ */
+:root {
+  --bg: #ffffff;
+  --bg2: #f5f5f5;
+  --bg3: #f0f0f0;
+  --border: #eeeeee;
+  --border2: #f3f3f3;
+  --text: #111111;
+  --text2: #666666;
+  --text3: #aaaaaa;
+  --card: #ffffff;
+  --input-bg: #fafafa;
+  --input-border: #eaeaea;
+  --top-bar: #ffffff;
+  --tab-bar: #ffffff;
+  --chat-bg: #b2c7d9;
+  --room-top: rgba(48,48,48,0.96);
+  --bubble-mine: #fee500;
+  --bubble-mine-text: #111;
+  --bubble-other: #ffffff;
+  --bubble-other-text: #111;
+  --room-input: #f0f0f0;
+  --more-hero: #f8f8f8;
+  --section-title: #aaaaaa;
+  --swipe-bg: #ffffff;
+  --chat-item-bg: #ffffff;
+  --msg-search-bg: #f5f5f5;
+}
+[data-theme="dark"] {
+  --bg: #1a1a1a;
+  --bg2: #232323;
+  --bg3: #2a2a2a;
+  --border: #333333;
+  --border2: #2d2d2d;
+  --text: #f0f0f0;
+  --text2: #aaaaaa;
+  --text3: #666666;
+  --card: #252525;
+  --input-bg: #2a2a2a;
+  --input-border: #404040;
+  --top-bar: #1e1e1e;
+  --tab-bar: #1e1e1e;
+  --chat-bg: #2c3e50;
+  --room-top: rgba(20,20,20,0.97);
+  --bubble-mine: #fee500;
+  --bubble-mine-text: #111;
+  --bubble-other: #3a3a3a;
+  --bubble-other-text: #f0f0f0;
+  --room-input: #252525;
+  --more-hero: #222222;
+  --section-title: #666666;
+  --swipe-bg: #1a1a1a;
+  --chat-item-bg: #1a1a1a;
+  --msg-search-bg: #2a2a2a;
+}
 
-  <!-- 인증 화면 -->
-  <div class="auth-screen" id="auth-screen">
-    <div class="splash-logo" id="splash-logo">
-      <i class="ti ti-brand-hipchat"></i>
-      <h2>톡톡</h2>
-      <p>TalkTalk Messenger</p>
-    </div>
-    <div class="auth-card" id="login-card">
-      <h3>로그인</h3>
-      <div class="auth-group">
-        <div class="auth-input-wrapper"><i class="ti ti-user"></i><input type="text" id="login-id" placeholder="아이디 입력"></div>
-        <div class="auth-input-wrapper"><i class="ti ti-lock"></i><input type="password" id="login-pw" placeholder="비밀번호 입력"></div>
-      </div>
-      <button class="btn-auth-primary" onclick="handleLogin()">시작하기</button>
-      <div class="auth-toggle-link" onclick="toggleAuthForm('register')">새로운 아이디 만들기</div>
-    </div>
-    <div class="auth-card" id="register-card">
-      <h3>아이디 생성</h3>
-      <div class="auth-group">
-        <div class="auth-input-wrapper"><i class="ti ti-user-plus"></i><input type="text" id="reg-id" placeholder="사용할 아이디"></div>
-        <div class="auth-input-wrapper"><i class="ti ti-lock"></i><input type="password" id="reg-pw" placeholder="비밀번호"></div>
-        <div class="auth-input-wrapper"><i class="ti ti-lock"></i><input type="password" id="reg-pw-confirm" placeholder="비밀번호 확인"></div>
-        <div class="auth-input-wrapper"><i class="ti ti-id"></i><input type="text" id="reg-name" placeholder="표시될 이름(닉네임)"></div>
-      </div>
-      <button class="btn-auth-primary" onclick="handleRegister()">생성 완료 및 로그인</button>
-      <div class="auth-toggle-link" onclick="toggleAuthForm('login')">이미 아이디가 있습니다</div>
-    </div>
-  </div>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  font-family: var(--app-font, -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif);
+  background: var(--bg);
+  font-size: var(--app-font-size, 15px);
+  transition: background 0.2s, color 0.2s;
+}
 
-  <!-- 토스트 알림 -->
-  <div id="toast-container"></div>
+#app {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+  background: var(--bg); position: relative;
+  padding-top: env(safe-area-inset-top);
+}
 
-  <!-- 숨김 파일 입력 -->
-  <input type="file" id="clip-file-input" accept="image/*" style="display:none;" onchange="handleClipFile(this)">
-  <input type="file" id="avatar-file-input" accept="image/*" style="display:none;" onchange="handleProfileImageUpload(this,'avatar')">
-  <input type="file" id="bg-file-input" accept="image/*" style="display:none;" onchange="handleProfileImageUpload(this,'bg')">
+/* ============================================================
+   인증 화면
+   ============================================================ */
+.auth-screen {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: #87CEEB !important;  /* 노란색 → 하늘색으로 변경 */
+  z-index: 20000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 30px; transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.auth-screen.fade-out { opacity: 0; pointer-events: none; transform: scale(1.05); }
+.splash-logo { text-align: center; animation: pulse 2s infinite ease-in-out; }
+.splash-logo i { font-size: 90px; color: #111; }
+.splash-logo h2 { font-size: 34px; font-weight: 900; color: #111; margin-top: 10px; letter-spacing: -1px; }
+.splash-logo p { font-size: 14px; color: rgba(0,0,0,0.5); margin-top: 5px; font-weight: 500; }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+.auth-card {
+  background: #fff; width: 100%; max-width: 340px; border-radius: 24px;
+  padding: 28px 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+  display: none; flex-direction: column; margin-top: 20px;
+}
+.auth-card.active { display: flex; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+.auth-card h3 { font-size: 20px; font-weight: 800; color: #111; margin-bottom: 20px; text-align: center; }
+.auth-group { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+.auth-input-wrapper { position: relative; display: flex; align-items: center; }
+.auth-input-wrapper i { position: absolute; left: 14px; color: #aaa; font-size: 18px; }
+.auth-input-wrapper input {
+  width: 100%; padding: 13px 14px 13px 42px; border: 1px solid #eaeaea;
+  border-radius: 12px; font-size: 14px; outline: none; background: #fafafa;
+  transition: all 0.25s;
+}
+.auth-input-wrapper input:focus { border-color: #111; background: #fff; }
+.btn-auth-primary {
+  background: #111; color: #fff; border: none; padding: 14px;
+  border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: background 0.2s; margin-top: 6px;
+}
+.auth-toggle-link {
+  font-size: 13px; color: #666; text-align: center; margin-top: 16px;
+  cursor: pointer; text-decoration: underline; font-weight: 500;
+}
 
-  <!-- 이미지 뷰어 -->
-  <div class="image-viewer-overlay" id="image-viewer">
-    <div class="iv-top">
-      <i class="ti ti-x" onclick="closeImageViewer()"></i>
-      <span>이미지 뷰어</span>
-      <i class="ti ti-dots-vertical" id="viewer-more-btn" onclick="toggleViewerDropdown(event)"></i>
-      <div class="iv-dropdown" id="viewer-dropdown">
-        <button class="iv-dropdown-item" onclick="deleteViewerImage()">사진 삭제</button>
-      </div>
-    </div>
-    <div class="iv-body"><div class="viewer-img-container" id="viewer-img-container"><img id="viewer-img-target" src="" alt="상세"></div></div>
-    <div class="iv-bottom">
-      <button class="iv-btn" onclick="rotateViewerImage(90)"><i class="ti ti-rotate-clockwise"></i>우회전</button>
-      <button class="iv-btn" onclick="rotateViewerImage(-90)"><i class="ti ti-rotate-counter-clockwise"></i>좌회전</button>
-      <button class="iv-btn" onclick="flipViewerImage('X')"><i class="ti ti-flip-horizontal"></i>좌우 반전</button>
-      <button class="iv-btn" onclick="flipViewerImage('Y')"><i class="ti ti-flip-vertical"></i>상하 반전</button>
-      <button class="iv-btn" onclick="saveViewerImage()"><i class="ti ti-download"></i>저장</button>
-    </div>
-  </div>
+/* ============================================================
+   토스트
+   ============================================================ */
+#toast-container {
+  position: fixed; top: calc(12px + env(safe-area-inset-top));
+  left: 12px; right: 12px; z-index: 25000;
+  display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+}
+.toast {
+  background: rgba(28,28,28,0.93); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-radius: 16px; padding: 12px 14px; display: flex; align-items: center; gap: 10px;
+  pointer-events: all; cursor: pointer; animation: toastIn 0.3s cubic-bezier(0.34,1.4,0.64,1) forwards;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.22);
+}
+.toast.hiding { animation: toastOut 0.25s ease forwards; }
+@keyframes toastIn { from { opacity:0; transform:translateY(-18px) scale(0.95); } to { opacity:1; transform:translateY(0) scale(1); } }
+@keyframes toastOut { from { opacity:1; transform:translateY(0) scale(1); } to { opacity:0; transform:translateY(-14px) scale(0.95); } }
+.toast-avatar { width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0; }
+.toast-body { flex: 1; min-width: 0; }
+.toast-name { font-size: 13px; font-weight: 700; color: #fff; }
+.toast-msg { font-size: 13px; color: rgba(255,255,255,0.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
 
-  <!-- 프로필 카드 -->
-  <div class="profile-card-overlay" id="profile-card">
-    <div class="pc-top">
-      <i class="ti ti-x" onclick="closeProfileCard()"></i>
-      <i class="ti ti-star" id="pc-star-btn" onclick="toggleFavoriteAction()"></i>
-    </div>
-    <div class="pc-center">
-      <div class="avatar-card avatar-base" id="pc-avatar" onclick="handleAvatarTouch()"><i class="ti ti-user" id="pc-avatar-icon"></i></div>
-      <div class="pc-name-area"><span id="pc-name">사용자</span><i class="ti ti-pencil" id="pc-edit-name-icon" onclick="openTextEditModal('name')"></i></div>
-      <div class="pc-status-area"><span id="pc-status">상태메시지</span><i class="ti ti-pencil" id="pc-edit-status-icon" onclick="openTextEditModal('status')"></i></div>
-    </div>
-    <div class="pc-bottom" id="pc-bottom-actions"></div>
-  </div>
+/* ============================================================
+   공통
+   ============================================================ */
+.avatar-base { background: #e2e4e7; color: #888d95; display: flex; align-items: center; justify-content: center; background-size: cover; background-position: center; overflow: hidden; flex-shrink: 0; }
 
-  <!-- 말풍선 컨텍스트 메뉴 -->
-  <div class="bubble-menu" id="bubble-context-menu">
-    <button onclick="handleBubbleDelete('me')">나에게만 삭제</button>
-    <button id="menu-delete-all-btn" onclick="handleBubbleDelete('all')">모두에게 삭제</button>
-  </div>
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 13000; display: none; align-items: center; justify-content: center; padding: 20px; }
+.modal-overlay.active { display: flex; }
+.modal-content { background: var(--card); width: 100%; max-width: 340px; border-radius: 16px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+.modal-content h3 { font-size: 16px; font-weight: 700; margin-bottom: 14px; color: var(--text); }
+.modal-content input { width: 100%; padding: 11px; border: 1px solid var(--input-border); border-radius: 8px; font-size: 14px; outline: none; margin-bottom: 12px; background: var(--input-bg); color: var(--text); }
+.modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+.modal-btns button { padding: 9px 15px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-cancel { background: var(--bg3); color: var(--text); }
+.btn-confirm { background: #fee500; color: #111; }
 
-  <!-- 텍스트 편집 모달 -->
-  <div class="modal-overlay" id="text-edit-modal">
-    <div class="modal-content">
-      <h3 id="text-modal-title">내용 편집</h3>
-      <input type="text" id="text-modal-input" placeholder="입력하세요">
-      <div class="modal-btns">
-        <button class="btn-cancel" onclick="closeTextEditModal()">취소</button>
-        <button class="btn-confirm" onclick="saveTextEditAction()">저장</button>
-      </div>
-    </div>
-  </div>
+.manage-list { max-height: 130px; overflow-y: auto; margin-bottom: 16px; border: 1px solid var(--border); border-radius: 8px; }
+.manage-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 0.5px solid var(--border); font-size: 14px; color: var(--text); }
+.manage-item-btns { display: flex; gap: 6px; }
 
-  <!-- 친구 관리 모달 -->
-  <div class="modal-overlay" id="manage-modal">
-    <div class="modal-content">
-      <h3>친구 목록 관리</h3>
-      <div class="manage-list" id="modal-manage-list"></div>
-      <h3>아이디로 친구 추가</h3>
-      <input type="text" id="new-friend-id-input" placeholder="상대방 아이디 입력">
-      <div class="modal-btns">
-        <button class="btn-cancel" onclick="closeManageModal()">닫기</button>
-        <button class="btn-confirm" onclick="addNewFriendWithVerify()">추가</button>
-      </div>
-    </div>
-  </div>
+/* ============================================================
+   프로필 카드
+   ============================================================ */
+.profile-card-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: #7a8188; background-size: cover; background-position: center; z-index: 11000; display: none; flex-direction: column; justify-content: space-between; padding: 40px 24px calc(40px + env(safe-area-inset-bottom)); }
+.profile-card-overlay::before { content: ''; position: absolute; top:0; left:0; right:0; bottom:0; background: rgba(0,0,0,0.35); z-index: 1; }
+.profile-card-overlay.active { display: flex; }
+.pc-top, .pc-center, .pc-bottom { position: relative; z-index: 2; }
+.pc-top { display: flex; justify-content: space-between; color: #fff; font-size: 22px; }
+.pc-top i { cursor: pointer; padding: 8px; }
+.pc-center { display: flex; flex-direction: column; align-items: center; text-align: center; color: #fff; }
+.avatar-card { width: 88px; height: 88px; border-radius: 32px; font-size: 38px; margin-bottom: 16px; box-shadow: 0 4px 14px rgba(0,0,0,0.2); cursor: pointer; }
+.pc-name-area, .pc-status-area { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.pc-name-area { font-size: 19px; font-weight: 700; }
+.pc-status-area { font-size: 13px; color: rgba(255,255,255,0.85); margin-top: 8px; max-width: 85%; }
+.pc-center i { font-size: 15px; color: rgba(255,255,255,0.65); cursor: pointer; padding: 2px; }
+.pc-bottom { border-top: 1px solid rgba(255,255,255,0.2); padding-top: 20px; display: flex; justify-content: center; gap: 24px; }
+.pc-action-btn { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #fff; background: none; border: none; cursor: pointer; font-size: 12px; font-weight: 500; }
+.pc-action-btn i { font-size: 22px; }
 
-  <!-- 단체채팅방 생성 모달 -->
-  <div class="modal-overlay" id="group-create-modal">
-    <div class="modal-content">
-      <h3>단체채팅방 만들기</h3>
-      <input type="text" id="group-name-input" placeholder="단체채팅방 이름 입력">
-      <div style="margin-bottom:10px; font-size:13px; color:#888;">초대할 친구 선택</div>
-      <div class="manage-list" id="group-member-list" style="max-height:160px;"></div>
-      <div class="modal-btns">
-        <button class="btn-cancel" onclick="closeGroupCreateModal()">취소</button>
-        <button class="btn-confirm" onclick="confirmCreateGroupChat()">만들기</button>
-      </div>
-    </div>
-  </div>
+/* ============================================================
+   이미지 뷰어
+   ============================================================ */
+.image-viewer-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 14000; display: none; flex-direction: column; }
+.image-viewer-overlay.active { display: flex; }
+.iv-top { display: flex; justify-content: space-between; align-items: center; padding: 16px; color: #fff; font-size: 20px; position: relative; z-index: 10; }
+.iv-top i { cursor: pointer; padding: 4px; }
+.iv-top span { font-size: 14px; font-weight: 600; }
+.iv-body { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: hidden; }
+.viewer-img-container { transition: transform 0.25s ease-out; display: flex; align-items: center; justify-content: center; }
+.viewer-img-container img { max-width: 100%; max-height: 70vh; object-fit: contain; }
+.iv-bottom { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; padding: 16px 24px calc(24px + env(safe-area-inset-bottom)); }
+.iv-btn { background: rgba(255,255,255,0.16); border: none; color: #fff; padding: 10px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 5px; backdrop-filter: blur(4px); }
+.iv-dropdown { position: absolute; top: 50px; right: 16px; background: #222; border: 1px solid #444; border-radius: 8px; display: none; flex-direction: column; min-width: 110px; z-index: 100; overflow: hidden; }
+.iv-dropdown.active { display: flex; }
+.iv-dropdown-item { padding: 10px 14px; color: #fff; font-size: 13px; cursor: pointer; text-align: left; background: none; border: none; font-weight: 500; }
+.iv-dropdown-item:hover { background: #333; }
 
-  <!-- 이미지 선택 모달 (갤러리 또는 기본 이미지) -->
-  <div class="modal-overlay" id="image-source-modal">
-    <div class="modal-content">
-      <h3>프로필 사진 설정</h3>
-      <div class="modal-btns" style="flex-direction: column; gap: 10px;">
-        <button class="btn-confirm" onclick="selectImageSource('gallery')" style="width:100%;">📷 갤러리에서 선택</button>
-        <button class="btn-cancel" onclick="selectImageSource('default')" style="width:100%;">🔄 기본 이미지로 변경</button>
-      </div>
-    </div>
-  </div>
+/* ============================================================
+   화면 & 헤더
+   ============================================================ */
+.screen { flex: 1; display: none; flex-direction: column; overflow: hidden; background: var(--bg); }
+.screen.active { display: flex; }
+.top-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; background: var(--top-bar); flex-shrink: 0; border-bottom: 0.5px solid var(--border); }
+.top-bar h1 { font-size: 21px; font-weight: 800; color: var(--text); }
+.top-icons { display: flex; gap: 4px; }
+.top-icons i { font-size: 22px; color: var(--text2); cursor: pointer; padding: 5px; border-radius: 8px; }
+.scroll-area { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
-  <!-- 단톡방 초대 모달 -->
-  <div class="modal-overlay" id="invite-modal">
-    <div class="modal-content">
-      <h3>친구 초대</h3>
-      <div style="margin-bottom:10px; font-size:13px; color:#888;">초대할 친구를 선택하세요</div>
-      <div class="manage-list" id="invite-member-list" style="max-height:180px;"></div>
-      <div class="modal-btns">
-        <button class="btn-cancel" onclick="closeInviteModal()">취소</button>
-        <button class="btn-confirm" onclick="confirmInviteMembers()">초대하기</button>
-      </div>
-    </div>
-  </div>
+/* ============================================================
+   검색바
+   ============================================================ */
+.search-bar-container { padding: 0 16px 10px; background: var(--top-bar); display: none; }
+.search-bar-container.active { display: block; }
+.search-input-wrapper { position: relative; display: flex; align-items: center; }
+.search-input-wrapper input { width: 100%; padding: 8px 36px 8px 12px; border: none; border-radius: 8px; background: var(--bg3); font-size: 14px; outline: none; color: var(--text); }
+.search-input-wrapper i { position: absolute; right: 10px; color: var(--text3); cursor: pointer; }
 
-  <!-- 관리자 밴 모달 -->
-  <div class="modal-overlay" id="admin-ban-modal">
-    <div class="modal-content">
-      <h3>🛡️ 관리자 기능 - 유저 관리</h3>
-      <div class="manage-list" id="admin-ban-list" style="max-height:200px;"></div>
-      <div class="modal-btns">
-        <button class="btn-cancel" onclick="closeAdminBanModal()">닫기</button>
-      </div>
-    </div>
-  </div>
+/* ============================================================
+   친구 목록
+   ============================================================ */
+.my-profile { display: flex; align-items: center; gap: 14px; padding: 16px; border-bottom: 8px solid var(--bg2); cursor: pointer; background: var(--bg); }
+.avatar-lg { width: 56px; height: 56px; border-radius: 20px; font-size: 26px; flex-shrink: 0; }
+.avatar-sm { width: 44px; height: 44px; border-radius: 16px; font-size: 20px; flex-shrink: 0; }
+.pname { font-size: 16px; font-weight: 700; color: var(--text); }
+.pstatus { font-size: 12px; color: var(--text3); margin-top: 3px; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.favorite-section { border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.section-title { font-size: 12px; color: var(--section-title); font-weight: 600; padding: 14px 16px 6px; background: var(--bg); }
+.friend-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: pointer; position: relative; background: var(--bg); }
+.friend-item .fi-star-badge { position: absolute; right: 16px; color: #f5a623; font-size: 16px; }
+.fi-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.fi-status { font-size: 12px; color: var(--text3); margin-top: 2px; }
+.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text3); padding-bottom: 60px; }
 
-  <!-- 폰트 설정 모달 -->
-  <div class="modal-overlay font-modal" id="font-modal">
-    <div class="modal-content">
-      <h3>글꼴 설정</h3>
-      <div class="font-size-section">
-        <label>글자 크기</label>
-        <div class="font-size-preview" id="font-preview-text">가나다라 마바사아 자차카타</div>
-        <input type="range" class="font-slider" id="font-size-slider" min="12" max="22" step="1" value="15" oninput="onFontSizeChange(this.value)">
-        <div class="font-size-labels"><span>작게</span><span>보통</span><span>크게</span></div>
-      </div>
-      <div class="font-family-section">
-        <label>글씨체</label>
-        <div class="font-list" id="font-list"></div>
-      </div>
-      <div class="modal-btns" style="margin-top:16px;">
-        <button class="btn-cancel" onclick="closeFontModal()">닫기</button>
-      </div>
-    </div>
-  </div>
+/* ============================================================
+   채팅 목록 스와이프 (단순화 - 스와이프만 유지)
+   ============================================================ */
+.chat-item-wrapper {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 0.5px solid var(--border2);
+  background: var(--chat-item-bg);
+}
+.chat-swipe-actions {
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  display: flex;
+  align-items: stretch;
+  width: 106px; /* 나가기 + 고정만 */
+  transform: translateX(106px);
+  transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  z-index: 1;
+}
+.chat-item-wrapper.swiped .chat-swipe-actions {
+  transform: translateX(0);
+}
+.chat-item-wrapper .chat-item {
+  position: relative;
+  z-index: 2;
+  background: var(--chat-item-bg);
+  transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  border-bottom: none !important;
+  margin: 0;
+}
+.chat-item-wrapper.swiped .chat-item {
+  transform: translateX(-106px);
+}
+.swa-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 53px; border: none; cursor: pointer; font-size: 10px; font-weight: 700;
+  color: #fff; gap: 4px; padding: 0; flex-shrink: 0;
+}
+.swa-btn i { font-size: 20px; }
+.swa-pin  { background: #5352ed; }
+.swa-leave{ background: #ff4757; }
 
-  <!-- 테마 설정 모달 -->
-<div class="modal-overlay" id="theme-modal">
-  <div class="modal-content">
-    <h3>테마 변경</h3>
-    <div class="theme-list">
-      <div class="theme-card" id="theme-white" onclick="setTheme('white')">
-        <div class="tc-circle" style="background:#ffffff; border-color:#ddd;"></div>
-        <div class="tc-name">화이트</div>
-        <i class="ti ti-check tc-check"></i>
-      </div>
-      <div class="theme-card" id="theme-dark" onclick="setTheme('dark')">
-        <div class="tc-circle" style="background:#1a1a1a; border-color:#555;"></div>
-        <div class="tc-name">블랙</div>
-        <i class="ti ti-check tc-check"></i>
-      </div>
-      <!-- 👇 포켓몬 테마 (몬스터볼 스타일) -->
-      <div class="theme-card theme-pokemon-card" id="theme-pokemon" onclick="setTheme('pokemon')">
-        <div class="tc-circle monster-ball-circle"></div>
-        <div class="tc-name">포켓몬</div>
-        <i class="ti ti-check tc-check"></i>
-      </div>
-    </div>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="closeThemeModal()">닫기</button>
-    </div>
-  </div>
-</div>
+/* ============================================================
+   채팅 목록
+   ============================================================ */
+.chat-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; cursor: pointer; }
+.chat-item.pinned { background: var(--bg2) !important; border-left: 3.5px solid #fee500; }
+.chat-avatar { width: 48px; height: 48px; border-radius: 18px; font-size: 22px; flex-shrink: 0; }
+.ci-info { flex: 1; min-width: 0; }
+.ci-row1 { display: flex; justify-content: space-between; align-items: center; }
+.ci-name { font-size: 15px; font-weight: 700; color: var(--text); }
+.ci-time { font-size: 11px; color: var(--text3); }
+.ci-row2 { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+.ci-preview { font-size: 13px; color: var(--text3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%; }
+.badge { background: #ff3b3b; color: #fff; font-size: 11px; font-weight: 700; border-radius: 10px; padding: 2px 6px; min-width: 18px; text-align: center; }
 
-  <!-- 채팅 검색 바 -->
-  <div class="chat-search-bar" id="chat-search-bar">
-    <div class="search-input-wrapper">
-      <input type="text" id="chat-search-input" placeholder="채팅방 검색" oninput="filterChats()">
-      <i class="ti ti-x" onclick="clearChatSearch()"></i>
-    </div>
-  </div>
+/* 채팅방 아이템 검색바 */
+.chat-search-bar { padding: 0 16px 10px; background: var(--top-bar); display: none; border-bottom: 0.5px solid var(--border); }
+.chat-search-bar.active { display: block; }
 
-  <!-- 친구 탭 -->
-  <div class="screen active" id="screen-friends">
-    <div class="top-bar">
-      <h1>친구</h1>
-      <div class="top-icons">
-        <i class="ti ti-search" onclick="toggleSearchBar()"></i>
-        <i class="ti ti-settings" onclick="openManageModal()"></i>
-      </div>
-    </div>
-    <div class="search-bar-container" id="friend-search-container">
-      <div class="search-input-wrapper">
-        <input type="text" id="friend-search-input" placeholder="이름 검색" oninput="filterFriends()">
-        <i class="ti ti-x" onclick="clearSearch()"></i>
-      </div>
-    </div>
-    <div class="scroll-area">
-      <div class="my-profile" onclick="openProfileCard('me')">
-        <div class="avatar-lg avatar-base" id="my-avatar-display"><i class="ti ti-user"></i></div>
-        <div>
-          <div class="pname" id="my-name-display">나</div>
-          <div class="pstatus" id="my-status-display">상태메시지</div>
-        </div>
-      </div>
-      <div id="friends-list-container"></div>
-    </div>
-  </div>
+/* ============================================================
+   채팅방
+   ============================================================ */
+#screen-room { background: var(--chat-bg); position: relative; }
+.room-top { background: var(--room-top); display: flex; align-items: center; gap: 10px; padding: 12px 14px; flex-shrink: 0; }
+.back-btn { color: #fff; font-size: 24px; cursor: pointer; }
+.room-title { font-size: 16px; font-weight: 700; color: #fff; flex: 1; }
+.room-icons { display: flex; gap: 14px; color: rgba(255,255,255,0.75); font-size: 20px; }
+.room-search-bar { background: var(--room-input); border-bottom: 1px solid var(--border); display: none; }
+.room-search-bar.active { display: block; }
 
-  <!-- 채팅 탭 -->
-  <div class="screen" id="screen-chats">
-    <div class="top-bar">
-      <h1>채팅</h1>
-      <div class="top-icons">
-        <i class="ti ti-search" onclick="toggleChatSearch()"></i>
-        <i class="ti ti-users" onclick="openGroupCreateModal()" title="단체 채팅방 만들기"></i>  <!-- 👈 
-      </div>
-    </div>
-    <div class="scroll-area" id="chats-list-container"></div>
-  </div>
+#room-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.date-sep { text-align: center; margin: 4px 0; }
+.date-sep span { background: rgba(0,0,0,0.15); color: #fff; font-size: 11px; padding: 3px 14px; border-radius: 20px; }
 
-  <!-- 채팅방 화면 -->
-  <div class="screen" id="screen-room">
-    <div class="room-top">
-      <i class="ti ti-chevron-left back-btn" onclick="closeRoom()"></i>
-      <span class="room-title" id="room-title">채팅방</span>
-      <div class="room-icons">
-        <i class="ti ti-search" id="room-search-icon" onclick="toggleRoomSearch()"></i>
-        <i class="ti ti-user-plus" id="room-invite-icon" onclick="openInviteModal()" title="친구 초대"></i>
-      </div>
-    </div>
-    <div class="room-search-bar" id="room-search-bar">
-      <div class="search-input-wrapper" style="padding:8px 12px;">
-        <input type="text" id="room-search-input" placeholder="메시지 검색" oninput="searchRoomMessages()">
-        <i class="ti ti-x" onclick="closeRoomSearch()"></i>
-      </div>
-    </div>
-    <div id="room-messages"></div>
-    <div class="room-input">
-      <button class="icon-btn" id="emo-toggle-btn" onclick="toggleEmoticonDrawer()"><i class="ti ti-mood-smile"></i></button>
-      <input type="text" id="msg-input" placeholder="메시지 보내기" autocomplete="off">
-      <button class="icon-btn" onclick="triggerClip()"><i class="ti ti-paperclip"></i></button>
-      <button id="send-btn"><i class="ti ti-send"></i></button>
-    </div>
-    <div class="emoticon-drawer" id="emoticon-drawer">
-      <div class="emo-item" onclick="selectEmot('👍')">👍</div>
-      <div class="emo-item" onclick="selectEmot('❤️')">❤️</div>
-      <div class="emo-item" onclick="selectEmot('😂')">😂</div>
-      <div class="emo-item" onclick="selectEmot('😎')">😎</div>
-      <div class="emo-item" onclick="selectEmot('😭')">😭</div>
-      <div class="emo-item" onclick="selectEmot('🎉')">🎉</div>
-      <div class="emo-item" onclick="selectEmot('💡')">💡</div>
-      <div class="emo-item" onclick="selectEmot('😡')">😡</div>
-    </div>
-  </div>
+.msg-row { display: flex; align-items: flex-end; gap: 6px; }
+.msg-row.mine { flex-direction: row-reverse; }
+.msg-av { width: 34px; height: 34px; border-radius: 12px; font-size: 14px; align-self: flex-start; flex-shrink: 0; }
+.msg-sender-name { font-size: 11px; color: rgba(255,255,255,0.75); margin-bottom: 3px; padding-left: 2px; }
+.bwrap { display: flex; flex-direction: column; max-width: 68%; position: relative; }
+.mine .bwrap { align-items: flex-end; }
+.bubble { padding: 9px 13px; border-radius: 16px; font-size: inherit; line-height: 1.5; word-break: break-word; cursor: pointer; -webkit-user-select: none; user-select: none; font-family: inherit; }
+.bubble.mine { background: var(--bubble-mine); color: var(--bubble-mine-text); border-bottom-right-radius: 4px; }
+.bubble.other { background: var(--bubble-other); color: var(--bubble-other-text); border-bottom-left-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.07); }
+.bubble.image-bubble { padding: 4px; background: #fff; border-radius: 12px; max-width: 160px; overflow: hidden; }
+.bubble.image-bubble img { width: 100%; height: auto; display: block; border-radius: 8px; max-height: 200px; object-fit: cover; }
+.bmeta { font-size: 10px; color: rgba(255,255,255,0.6); margin-top: 3px; }
+.mine .bmeta { color: #888; }
 
-  <!-- 더보기 탭 -->
-  <div class="screen" id="screen-more">
-    <div class="top-bar">
-      <h1>더보기</h1>
-    </div>
-    <div class="more-hero" onclick="openProfileCard('me')">
-      <div class="more-avatar avatar-base" id="more-avatar-display"><i class="ti ti-user" style="font-size:36px;"></i></div>
-      <div class="more-name" id="more-name-display">나</div>
-      <div class="more-status-txt" id="more-status-display">상태메시지</div>
-    </div>
-    <div class="more-menu">
-      <div class="mm-item" onclick="openProfileCard('me')"><i class="ti ti-user"></i><span class="mm-label">프로필 관리</span><i class="ti ti-chevron-right mm-arr"></i></div>
-      <div class="mm-item" onclick="openFontModal()"><i class="ti ti-typography"></i><span class="mm-label">글꼴 설정</span><i class="ti ti-chevron-right mm-arr"></i></div>
-      <div class="mm-item" onclick="openThemeModal()"><i class="ti ti-palette"></i><span class="mm-label">테마 변경</span><i class="ti ti-chevron-right mm-arr"></i></div>
-      <div class="mm-item" id="admin-panel-btn" style="display:none;" onclick="openAdminBanModal()"><i class="ti ti-shield" style="color:#5352ed;"></i><span class="mm-label" style="color:#5352ed; font-weight:700;">관리자 패널</span><i class="ti ti-chevron-right mm-arr"></i></div>
-      <div class="mm-item" onclick="handleLogout()"><i class="ti ti-logout" style="color:#ff4757;"></i><span class="mm-label" style="color:#ff4757; font-weight:600;">로그아웃</span><i class="ti ti-chevron-right mm-arr"></i></div>
-    </div>
-  </div>
+/* ============================================================
+   말풍선 컨텍스트 메뉴
+   ============================================================ */
+.bubble-menu { position: absolute; background: #222; border-radius: 8px; padding: 4px 0; z-index: 12000; display: none; flex-direction: column; min-width: 110px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+.bubble-menu.active { display: flex; }
+.bubble-menu button { background: none; border: none; color: #fff; padding: 8px 12px; font-size: 12px; text-align: left; cursor: pointer; font-weight: 500; }
+.bubble-menu button:hover { background: #333; }
 
-  <!-- 탭바 -->
-  <div id="tab-bar">
-    <button class="tab-btn active" id="tab-friends" onclick="switchTab('friends')"><i class="ti ti-user"></i><span>친구</span></button>
-    <button class="tab-btn" id="tab-chats" onclick="switchTab('chats')"><i class="ti ti-message-2"></i><div class="tab-dot" id="chat-dot"></div><span>채팅</span></button>
-    <button class="tab-btn" id="tab-more" onclick="switchTab('more')"><i class="ti ti-dots"></i><span>더보기</span></button>
-  </div>
+/* ============================================================
+   채팅 입력창 & 이모티콘
+   ============================================================ */
+.room-input { background: var(--room-input); padding: 8px 10px; display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--border); position: relative; z-index: 100; }
+.icon-btn { width: 36px; height: 36px; border: none; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--text2); font-size: 22px; }
+.icon-btn.active { color: #f5a623; }
+#msg-input { flex: 1; padding: 9px 14px; border: none; border-radius: 22px; background: var(--card); font-size: inherit; font-family: inherit; outline: none; color: var(--text); }
+#send-btn { width: 36px; height: 36px; border: none; background: #fee500; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #333; }
+.emoticon-drawer { background: var(--bg2); border-top: 1px solid var(--border); height: 110px; display: none; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 12px 16px; overflow-y: auto; padding-bottom: env(safe-area-inset-bottom); }
+.emoticon-drawer.active { display: grid; }
+.emo-item { font-size: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 8px; }
 
-</div>
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-<script src="script.js"></script>
-</body>
-</html>
+/* ============================================================
+   더보기 탭
+   ============================================================ */
+.more-hero { display: flex; flex-direction: column; align-items: center; padding: 36px 16px 24px; background: var(--more-hero); border-bottom: 8px solid var(--bg3); cursor: pointer; }
+.more-avatar { width: 68px; height: 68px; border-radius: 24px; font-size: 32px; margin-bottom: 10px; }
+.more-name { font-size: 18px; font-weight: 800; color: var(--text); }
+.more-status-txt { font-size: 13px; color: var(--text3); margin-top: 5px; }
+.mm-item { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-bottom: 0.5px solid var(--border2); cursor: pointer; background: var(--bg); }
+.mm-item i { font-size: 20px; color: var(--text2); width: 24px; text-align: center; }
+.mm-label { flex: 1; font-size: 15px; color: var(--text); }
+.mm-arr { font-size: 18px; color: var(--border); }
+
+/* ============================================================
+   탭바
+   ============================================================ */
+#tab-bar { background: var(--tab-bar); border-top: 1px solid var(--border); display: flex; padding-bottom: env(safe-area-inset-bottom); }
+.tab-btn { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 9px 0 10px; cursor: pointer; border: none; background: none; color: var(--text3); gap: 3px; position: relative; }
+.tab-btn.active { color: var(--text); }
+.tab-btn i { font-size: 25px; }
+.tab-btn span { font-size: 10px; font-weight: 600; }
+.tab-dot { position: absolute; top: 7px; left: 50%; margin-left: 5px; width: 8px; height: 8px; background: #ff3b3b; border-radius: 50%; border: 2px solid var(--tab-bar); display: none; }
+
+/* ============================================================
+   폰트 설정 모달
+   ============================================================ */
+.font-modal .modal-content { max-width: 360px; }
+.font-size-section { margin-bottom: 20px; }
+.font-size-section label { font-size: 13px; color: var(--text2); font-weight: 600; display: block; margin-bottom: 10px; }
+.font-size-preview { background: var(--bg2); border-radius: 12px; padding: 12px 16px; margin-bottom: 10px; font-family: inherit; color: var(--text); line-height: 1.5; min-height: 44px; }
+.font-slider { width: 100%; accent-color: #fee500; height: 4px; }
+.font-size-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+.font-family-section label { font-size: 13px; color: var(--text2); font-weight: 600; display: block; margin-bottom: 10px; }
+.font-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
+.font-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px; border-radius: 10px; cursor: pointer;
+  border: 2px solid var(--border); background: var(--bg);
+  transition: border-color 0.2s;
+}
+.font-item.selected { border-color: #fee500; background: rgba(254,229,0,0.08); }
+.font-item-preview { font-size: 16px; color: var(--text); }
+.font-item-name { font-size: 12px; color: var(--text3); }
+
+/* ============================================================
+   테마 설정 모달
+   ============================================================ */
+.theme-list { display: flex; gap: 12px; margin-bottom: 16px; }
+.theme-card {
+  flex: 1; border-radius: 12px; padding: 16px 10px; cursor: pointer;
+  border: 2px solid var(--border); text-align: center;
+  transition: border-color 0.2s; position: relative;
+}
+.theme-card.selected { border-color: #fee500; }
+.theme-card .tc-circle { width: 36px; height: 36px; border-radius: 50%; margin: 0 auto 8px; border: 2px solid rgba(0,0,0,0.1); }
+.theme-card .tc-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.theme-card .tc-check { position: absolute; top: 8px; right: 8px; font-size: 14px; color: #fee500; display: none; }
+.theme-card.selected .tc-check { display: block; }
+
+/* 스와이프 관련 옛날 잔재 제거용 */
+.swipe-action-menu { display: none !important; }
+
+/* ============================================================
+   포켓몬 테마 (개인용) - 진짜 포켓몬 이미지 버전
+   ============================================================ */
+[data-theme="pokemon"] {
+  --bg: #fff9e8;
+  --bg2: #fef0d8;
+  --bg3: #fde8c8;
+  --border: #f5d8a8;
+  --text: #5a3e1b;
+  --text2: #8b6b3d;
+  --text3: #c4a56e;
+  --card: #ffffff;
+  --input-bg: #fffdf5;
+  --bubble-mine: #ffde6e;
+  --bubble-mine-text: #5a3e1b;
+  --bubble-other: #ffffff;
+  --room-top: #ffde6e;
+  --chat-bg: #f5e6c8;
+  --more-hero: #ffde6e;
+  --section-title: #c4a56e;
+  --swipe-bg: #fff9e8;
+  --chat-item-bg: #fff9e8;
+}
+
+/* 헤더 배경 */
+[data-theme="pokemon"] .top-bar {
+  background: #ffde6e !important;
+}
+
+/* 헤더 아이콘 색상 */
+[data-theme="pokemon"] .top-icons i,
+[data-theme="pokemon"] .back-btn,
+[data-theme="pokemon"] .room-icons i {
+  color: #5a3e1b !important;
+}
+
+/* ============================================================
+   포켓몬 테마 (개인용) - 진짜 포켓몬 이미지 + 배경 ver
+   ============================================================ */
+[data-theme="pokemon"] {
+  --bg: #fff9e8;
+  --bg2: #fef0d8;
+  --bg3: #fde8c8;
+  --border: #f5d8a8;
+  --text: #5a3e1b;
+  --text2: #8b6b3d;
+  --text3: #c4a56e;
+  --card: #ffffff;
+  --input-bg: #fffdf5;
+  --bubble-mine: #ffde6e;
+  --bubble-mine-text: #5a3e1b;
+  --bubble-other: #ffffff;
+  --room-top: #ffde6e;
+  --chat-bg: #a8d8ea;
+  --more-hero: #ffde6e;
+  --section-title: #c4a56e;
+  --swipe-bg: #fff9e8;
+  --chat-item-bg: #fff9e8;
+}
+
+/* 헤더 배경 */
+[data-theme="pokemon"] .top-bar {
+  background: #ffde6e !important;
+}
+
+/* 헤더 아이콘 색상 */
+[data-theme="pokemon"] .top-icons i,
+[data-theme="pokemon"] .back-btn,
+[data-theme="pokemon"] .room-icons i {
+  color: #5a3e1b !important;
+}
+
+/* ============================================================
+   탭바 아이콘을 진짜 포켓몬 이미지로 변경
+   ============================================================ */
+[data-theme="pokemon"] #tab-friends i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  font-size: 0 !important;
+  width: 28px;
+  height: 28px;
+  display: inline-block;
+}
+[data-theme="pokemon"] #tab-friends i::before { content: "" !important; display: none; }
+
+[data-theme="pokemon"] #tab-chats i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  font-size: 0 !important;
+  width: 28px;
+  height: 28px;
+  display: inline-block;
+}
+[data-theme="pokemon"] #tab-chats i::before { content: "" !important; display: none; }
+
+[data-theme="pokemon"] #tab-more i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  font-size: 0 !important;
+  width: 28px;
+  height: 28px;
+  display: inline-block;
+}
+[data-theme="pokemon"] #tab-more i::before { content: "" !important; display: none; }
+
+[data-theme="pokemon"] .tab-btn i {
+  font-size: 0 !important;
+  width: 28px;
+  height: 28px;
+  display: inline-block;
+}
+
+/* ============================================================
+   포켓몬 테마 (개인용)
+   ============================================================ */
+[data-theme="pokemon"] {
+  --bg: #fff9e8;
+  --bg2: #fef0d8;
+  --bg3: #fde8c8;
+  --border: #f5d8a8;
+  --text: #5a3e1b;
+  --text2: #8b6b3d;
+  --text3: #c4a56e;
+  --card: #ffffff;
+  --input-bg: #fffdf5;
+  --bubble-mine: #ffde6e;
+  --bubble-mine-text: #5a3e1b;
+  --bubble-other: #ffffff;
+  --room-top: #ffde6e;
+  --chat-bg: #a8d8ea;
+  --more-hero: #ffde6e;
+  --section-title: #c4a56e;
+  --swipe-bg: #fff9e8;
+  --chat-item-bg: #fff9e8;
+}
+
+/* 헤더 배경 */
+[data-theme="pokemon"] .top-bar {
+  background: #ffde6e !important;
+}
+
+/* 헤더 아이콘 색상 */
+[data-theme="pokemon"] .top-icons i,
+[data-theme="pokemon"] .back-btn,
+[data-theme="pokemon"] .room-icons i {
+  color: #5a3e1b !important;
+}
+
+/* 탭바 아이콘 (포켓몬 이미지로 변경 - 크기 유지) */
+[data-theme="pokemon"] #tab-friends i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-color: transparent !important;
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+}
+[data-theme="pokemon"] #tab-friends i::before { content: "" !important; display: none; }
+
+[data-theme="pokemon"] #tab-chats i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-color: transparent !important;
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+}
+[data-theme="pokemon"] #tab-chats i::before { content: "" !important; display: none; }
+
+[data-theme="pokemon"] #tab-more i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-color: transparent !important;
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+}
+[data-theme="pokemon"] #tab-more i::before { content: "" !important; display: none; }
+
+/* 채팅방 배경 */
+[data-theme="pokemon"] #screen-room {
+  background-image: url('https://yrndqghsdtxoajgxvqrv.supabase.co/storage/v1/object/public/chat-images/pokemon.jpg') !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  position: relative;
+  overflow: hidden;
+}
+
+[data-theme="pokemon"] #room-messages {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+}
+
+/* 말풍선 */
+[data-theme="pokemon"] .bubble.mine {
+  background: #ffde6e !important;
+  color: #5a3e1b !important;
+}
+[data-theme="pokemon"] .bubble.other {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: #5a3e1b !important;
+}
+
+/* 채팅방 상단 */
+[data-theme="pokemon"] .room-top {
+  background: #ffde6e !important;
+}
+[data-theme="pokemon"] .room-title {
+  color: #5a3e1b !important;
+}
+
+/* 더보기 헤더 */
+[data-theme="pokemon"] .more-hero {
+  background: #ffde6e !important;
+}
+
+/* 탭바 활성화 색상 */
+[data-theme="pokemon"] .tab-btn.active {
+  color: #ff6b9d !important;
+}
+
+/* 로딩 스피너 */
+[data-theme="pokemon"] .loading-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 20px auto;
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png');
+  background-size: contain;
+  animation: pokemon-spin 1s infinite linear;
+}
+@keyframes pokemon-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 몬스터볼 테마 카드 스타일 */
+.monster-ball-circle {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 8px;
+  border-radius: 50%;
+  background: white;
+  position: relative;
+  transition: transform 0.3s ease;
+  overflow: hidden;
+  box-shadow: 0 0 0 2px #333, 0 0 0 4px #ddd;
+}
+.monster-ball-circle::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: #ff4757;
+  z-index: 0;
+}
+.monster-ball-circle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  background: #333;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+.theme-pokemon-card:hover .monster-ball-circle {
+  transform: rotate(15deg);
+  animation: shake 0.3s ease-in-out;
+}
+@keyframes shake {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(20deg); }
+}
+.theme-card.selected .monster-ball-circle {
+  box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #333;
+  animation: glow 0.5s ease;
+}
+@keyframes glow {
+  0% { box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #333; }
+  50% { box-shadow: 0 0 0 6px #ffde6e, 0 0 0 8px #333; }
+  100% { box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #333; }
+}
