@@ -721,102 +721,59 @@ async function chatSwipeAction(action, roomId) {
    채팅방 열기
    ============================================================ */
 async function openRoomWithFriend(friendId) {
-  // 1. 이미 존재하는 1:1 채팅방 찾기 (중복 방지 - 더 정확하게)
-  const { data: existingRoom } = await supabaseClient
+  // 1. 상대방이 속한 1:1 채팅방 조회 (내가 나간 상태여도 찾기 위해)
+  const { data: friendRooms } = await supabaseClient
     .from('chat_room_members')
     .select('room_id, chat_rooms!inner(*)')
-    .eq('user_id', currentUserId)
+    .eq('user_id', friendId)
     .eq('chat_rooms.is_group', false);
   
-  const myRoomIds = existingRoom?.map(r => r.room_id) || [];
-  
-  if (myRoomIds.length > 0) {
-    const { data: sharedRooms } = await supabaseClient
+  // 2. 그중에서 내가 속하지 않은 방이 있는지 확인 (내가 나간 방)
+  let targetRoom = null;
+  for (const fr of friendRooms || []) {
+    // 상대방이 속한 방의 멤버 목록 조회
+    const { data: members } = await supabaseClient
       .from('chat_room_members')
-      .select('room_id')
-      .eq('user_id', friendId)
-      .in('room_id', myRoomIds);
+      .select('user_id')
+      .eq('room_id', fr.room_id);
     
-    if (sharedRooms && sharedRooms.length > 0) {
-      // 기존 방이 있다면 그 방을 사용
-      const { data: roomData } = await supabaseClient
-        .from('chat_rooms')
-        .select('*')
-        .eq('id', sharedRooms[0].room_id)
-        .single();
-      
-      if (roomData) {
-        // 멤버 정보 추가
-        const { data: members } = await supabaseClient
-          .from('chat_room_members')
-          .select('user_id')
-          .eq('room_id', roomData.id);
-        roomData.members = members?.map(m => m.user_id) || [];
-        
-        // 이미 목록에 없으면 추가
-        if (!chatRoomsList.find(r => r.id === roomData.id)) {
-          chatRoomsList.push(roomData);
-        }
-        openRoomFromData(roomData.id);
-        return;
-      }
+    const memberIds = members?.map(m => m.user_id) || [];
+    
+    // 내가 이 방에 속해 있는지 확인
+    if (!memberIds.includes(currentUserId)) {
+      // 내가 나간 방 발견!
+      targetRoom = {
+        ...fr.chat_rooms,
+        members: memberIds
+      };
+      break;
     }
   }
   
-  // 2. 정말 없으면 새로 생성 (중복 생성 방지를 위한 최종 확인)
+  // 3. 나간 방이 있으면 그 방으로 재입장
+  if (targetRoom) {
+    // 멤버로 다시 추가
+    await supabaseClient.from('chat_room_members').insert({
+      room_id: targetRoom.id,
+      user_id: currentUserId
+    });
+    
+    targetRoom.members.push(currentUserId);
+    
+    if (!chatRoomsList.find(r => r.id === targetRoom.id)) {
+      chatRoomsList.push(targetRoom);
+    }
+    openRoomFromData(targetRoom.id);
+    return;
+  }
+  
+  // 4. 나간 방이 없으면 (처음 대화) 새로 생성
   const friend = friendsList.find(f => f.id === friendId);
   if (!friend) { 
     showToast("오류","친구 정보를 찾을 수 없습니다.","#ff4757"); 
     return; 
   }
   
-  // ✅ 추가: 같은 이름의 1:1 채팅방이 이미 존재하는지 최종 확인
-  const { data: duplicateCheck } = await supabaseClient
-    .from('chat_rooms')
-    .select('id')
-    .eq('name', friend.name)
-    .eq('is_group', false)
-    .maybeSingle();
-  
-  if (duplicateCheck) {
-    // 이미 있는 방이면 멤버인지 확인 후 추가
-    const { data: isMember } = await supabaseClient
-      .from('chat_room_members')
-      .select('user_id')
-      .eq('room_id', duplicateCheck.id)
-      .eq('user_id', currentUserId)
-      .maybeSingle();
-    
-    if (!isMember) {
-      await supabaseClient.from('chat_room_members').insert([
-        { room_id: duplicateCheck.id, user_id: currentUserId },
-        { room_id: duplicateCheck.id, user_id: friendId }
-      ]);
-    }
-    
-    // 방 정보 가져오기
-    const { data: roomData } = await supabaseClient
-      .from('chat_rooms')
-      .select('*')
-      .eq('id', duplicateCheck.id)
-      .single();
-    
-    if (roomData) {
-      const { data: members } = await supabaseClient
-        .from('chat_room_members')
-        .select('user_id')
-        .eq('room_id', roomData.id);
-      roomData.members = members?.map(m => m.user_id) || [];
-      
-      if (!chatRoomsList.find(r => r.id === roomData.id)) {
-        chatRoomsList.push(roomData);
-      }
-      openRoomFromData(roomData.id);
-      return;
-    }
-  }
-  
-  // 3. 진짜 없으면 새로 생성
   const { data: newRoom, error } = await supabaseClient
     .from('chat_rooms')
     .insert({ name: friend.name, is_group: false, created_by: currentUserId })
@@ -837,7 +794,6 @@ async function openRoomWithFriend(friendId) {
   chatRoomsList.push(newRoom);
   openRoomFromData(newRoom.id);
 }
-
 async function openRoomFromData(roomId) {
   let room = chatRoomsList.find(r => r.id === roomId);
   if (!room) {
