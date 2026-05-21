@@ -29,11 +29,11 @@
     <div class="auth-card" id="register-card">
       <h3>아이디 생성</h3>
       <div class="auth-group">
-  <div class="auth-input-wrapper"><i class="ti ti-user-plus"></i><input type="text" id="reg-id" placeholder="사용할 아이디"></div>
-  <div class="auth-input-wrapper"><i class="ti ti-lock"></i><input type="password" id="reg-pw" placeholder="비밀번호"></div>
-  <div class="auth-input-wrapper"><i class="ti ti-lock"></i><input type="password" id="reg-pw-confirm" placeholder="비밀번호 확인"></div>
-  <div class="auth-input-wrapper"><i class="ti ti-id"></i><input type="text" id="reg-name" placeholder="표시될 이름(닉네임)"></div>
-</div>
+        <div class="auth-input-wrapper"><i class="ti ti-user-plus"></i><input type="text" id="reg-id" placeholder="사용할 아이디"></div>
+        <div class="auth-input-wrapper"><i class="ti ti-lock"></i><input type="password" id="reg-pw" placeholder="비밀번호"></div>
+        <div class="auth-input-wrapper"><i class="ti ti-lock"></i><input type="password" id="reg-pw-confirm" placeholder="비밀번호 확인"></div>
+        <div class="auth-input-wrapper"><i class="ti ti-id"></i><input type="text" id="reg-name" placeholder="표시될 이름(닉네임)"></div>
+      </div>
       <button class="btn-auth-primary" onclick="handleRegister()">생성 완료 및 로그인</button>
       <div class="auth-toggle-link" onclick="toggleAuthForm('login')">이미 아이디가 있습니다</div>
     </div>
@@ -51,7 +51,7 @@
   <div class="image-viewer-overlay" id="image-viewer">
     <div class="iv-top">
       <i class="ti ti-x" onclick="closeImageViewer()"></i>
-      <span>스마트 이미지 뷰어</span>
+      <span>이미지 뷰어</span>
       <i class="ti ti-dots-vertical" id="viewer-more-btn" onclick="toggleViewerDropdown(event)"></i>
       <div class="iv-dropdown" id="viewer-dropdown">
         <button class="iv-dropdown-item" onclick="deleteViewerImage()">사진 삭제</button>
@@ -79,14 +79,6 @@
       <div class="pc-status-area"><span id="pc-status">상태메시지</span><i class="ti ti-pencil" id="pc-edit-status-icon" onclick="openTextEditModal('status')"></i></div>
     </div>
     <div class="pc-bottom" id="pc-bottom-actions"></div>
-  </div>
-
-  <!-- 채팅방 스와이프 액션 메뉴 -->
-  <div class="swipe-action-menu" id="swipe-action-menu">
-    <button class="sa-btn sa-pin" id="sa-pin-btn" onclick="swipeAction('pin')"><i class="ti ti-pin"></i><span id="sa-pin-label">상단고정</span></button>
-    <button class="sa-btn sa-mute" id="sa-mute-btn" onclick="swipeAction('mute')"><i class="ti ti-bell-off" id="sa-mute-icon"></i><span id="sa-mute-label">알림끄기</span></button>
-    <button class="sa-btn sa-read" onclick="swipeAction('read')"><i class="ti ti-check"></i><span>읽음처리</span></button>
-    <button class="sa-btn sa-leave" onclick="swipeAction('leave')"><i class="ti ti-door-exit"></i><span>나가기</span></button>
   </div>
 
   <!-- 말풍선 컨텍스트 메뉴 -->
@@ -135,7 +127,7 @@
     </div>
   </div>
 
-  <!-- 단톡방 초대 모달 (기존 채팅에서 초대) -->
+  <!-- 단톡방 초대 모달 -->
   <div class="modal-overlay" id="invite-modal">
     <div class="modal-content">
       <h3>친구 초대</h3>
@@ -159,7 +151,49 @@
     </div>
   </div>
 
-  <!-- 채팅 검색 바 (채팅 탭) -->
+  <!-- 폰트 설정 모달 -->
+  <div class="modal-overlay font-modal" id="font-modal">
+    <div class="modal-content">
+      <h3>글꼴 설정</h3>
+      <div class="font-size-section">
+        <label>글자 크기</label>
+        <div class="font-size-preview" id="font-preview-text">가나다라 마바사아 자차카타</div>
+        <input type="range" class="font-slider" id="font-size-slider" min="12" max="22" step="1" value="15" oninput="onFontSizeChange(this.value)">
+        <div class="font-size-labels"><span>작게</span><span>보통</span><span>크게</span></div>
+      </div>
+      <div class="font-family-section">
+        <label>글씨체</label>
+        <div class="font-list" id="font-list"></div>
+      </div>
+      <div class="modal-btns" style="margin-top:16px;">
+        <button class="btn-cancel" onclick="closeFontModal()">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 테마 설정 모달 -->
+  <div class="modal-overlay" id="theme-modal">
+    <div class="modal-content">
+      <h3>테마 변경</h3>
+      <div class="theme-list">
+        <div class="theme-card" id="theme-white" onclick="setTheme('white')">
+          <div class="tc-circle" style="background:#ffffff; border-color:#ddd;"></div>
+          <div class="tc-name">화이트</div>
+          <i class="ti ti-check tc-check"></i>
+        </div>
+        <div class="theme-card" id="theme-dark" onclick="setTheme('dark')">
+          <div class="tc-circle" style="background:#1a1a1a; border-color:#555;"></div>
+          <div class="tc-name">블랙</div>
+          <i class="ti ti-check tc-check"></i>
+        </div>
+      </div>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeThemeModal()">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 채팅 검색 바 -->
   <div class="chat-search-bar" id="chat-search-bar">
     <div class="search-input-wrapper">
       <input type="text" id="chat-search-input" placeholder="채팅방 검색" oninput="filterChats()">
@@ -252,6 +286,8 @@
     </div>
     <div class="more-menu">
       <div class="mm-item" onclick="openProfileCard('me')"><i class="ti ti-user"></i><span class="mm-label">프로필 관리</span><i class="ti ti-chevron-right mm-arr"></i></div>
+      <div class="mm-item" onclick="openFontModal()"><i class="ti ti-typography"></i><span class="mm-label">글꼴 설정</span><i class="ti ti-chevron-right mm-arr"></i></div>
+      <div class="mm-item" onclick="openThemeModal()"><i class="ti ti-palette"></i><span class="mm-label">테마 변경</span><i class="ti ti-chevron-right mm-arr"></i></div>
       <div class="mm-item" id="admin-panel-btn" style="display:none;" onclick="openAdminBanModal()"><i class="ti ti-shield" style="color:#5352ed;"></i><span class="mm-label" style="color:#5352ed; font-weight:700;">관리자 패널</span><i class="ti ti-chevron-right mm-arr"></i></div>
       <div class="mm-item" onclick="handleLogout()"><i class="ti ti-logout" style="color:#ff4757;"></i><span class="mm-label" style="color:#ff4757; font-weight:600;">로그아웃</span><i class="ti ti-chevron-right mm-arr"></i></div>
     </div>
