@@ -587,6 +587,16 @@ async function openRoomFromData(roomId) {
     room = roomData;
     chatRoomsList.push(room);
   }
+  
+  // 👇 추가: 멤버 정보가 없으면 가져오기 (이 부분이 추가됨)
+  if (!room.members || room.members.length === 0) {
+    const { data: memberRows } = await supabaseClient
+      .from('chat_room_members')
+      .select('user_id')
+      .eq('room_id', room.id);
+    room.members = memberRows?.map(r => r.user_id) || [];
+  }
+  
   currentRoom = room;
   roomOpen = true;
 
@@ -621,24 +631,39 @@ async function openRoomFromData(roomId) {
 }
 
 async function loadMessages(roomId) {
-  const { data: messages } = await supabaseClient
-    .from('messages').select('*').eq('room_id', roomId).order('created_at', { ascending: true });
   const container = document.getElementById('room-messages');
   if (!container) return;
+  
+  // 로딩 표시
+  container.innerHTML = '<div class="loading-spinner"></div><div style="text-align:center; padding:20px;">메시지 불러오는 중...</div>';
+  
+  // 1. 메시지만 먼저 가져오기
+  const { data: messages } = await supabaseClient
+    .from('messages')
+    .select('*')
+    .eq('room_id', roomId)
+    .order('created_at', { ascending: true });
+  
+  // 2. 방 멤버 정보 (친구 목록에서 재사용)
+  const memberIds = currentRoom.members || [];
+  
+  // 3. 프로필 정보 (친구 목록 + 본인)
+  const memberProfiles = memberIds.map(id => {
+    if (id === currentUserId) return currentUserProfile;
+    return friendsList.find(f => f.id === id);
+  }).filter(Boolean);
+  
+  window._roomMemberProfiles = memberProfiles;
+  
+  // 4. 메시지 렌더링
   container.innerHTML = `<div class="date-sep"><span>${dateStr()}</span></div>`;
-
-  // 방 멤버 정보
-  const { data: memberRows } = await supabaseClient.from('chat_room_members').select('user_id').eq('room_id', roomId);
-  const memberIds = memberRows?.map(r => r.user_id) || [];
-  const { data: memberProfiles } = await supabaseClient.from('profiles').select('id, name, avatar').in('id', memberIds);
-  window._roomMemberProfiles = memberProfiles || [];
-
+  
   for (const msg of messages || []) {
     if (msg.deleted_for_all) continue;
-    // 차단된 사람 메시지 숨김
     if (blockedList.includes(msg.sender_id)) continue;
     appendMessageToUI(msg);
   }
+  
   container.scrollTop = container.scrollHeight;
 }
 
