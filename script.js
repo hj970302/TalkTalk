@@ -1328,13 +1328,22 @@ function startGlobalRealtime() {
   globalSubscription = supabaseClient
     .channel('global-realtime')
     // 1. 새 메시지 감지 (기존 기능)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
       const msg = payload.new;
       if (msg.sender_id === currentUserId) return;
       if (blockedList.includes(msg.sender_id)) return;
       
-      const myRoomIds = chatRoomsList.map(r => r.id);
-      if (!myRoomIds.includes(msg.room_id)) return;
+     const myRoomIds = chatRoomsList.map(r => r.id);
+if (!myRoomIds.includes(msg.room_id)) {
+  // 나간 방에 새 메시지 오면 다시 참여
+  await supabaseClient.from('chat_room_members').insert({
+    room_id: msg.room_id,
+    user_id: currentUserId
+  });
+  await loadChatRooms();
+  renderChats();
+  return;
+}
       
       if (roomOpen && currentRoom.id === msg.room_id) return;
       
