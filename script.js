@@ -213,7 +213,7 @@ function syncMyProfileDOM() {
   });
   ['my-status-display','more-status-display'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.textContent = currentUserProfile.status || '상태메시지';
+    if (el) el.textContent = currentUserProfile.status || '';
   });
   applyAvatarStyle(document.getElementById('my-avatar-display'), currentUserProfile.avatar);
   applyAvatarStyle(document.getElementById('more-avatar-display'), currentUserProfile.avatar);
@@ -1020,7 +1020,7 @@ async function openProfileCard(id) {
 
   if (id === 'me') {
     document.getElementById('pc-name').textContent = currentUserProfile.name;
-    document.getElementById('pc-status').textContent = currentUserProfile.status || '상태메시지';
+    document.getElementById('pc-status').textContent = currentUserProfile.status || '';
     nameEditIcon.style.display = 'inline-block';
     statusEditIcon.style.display = 'inline-block';
     starBtn.style.display = 'none';
@@ -1123,19 +1123,33 @@ function closeTextEditModal() { document.getElementById('text-edit-modal')?.clas
 
 async function saveTextEditAction() {
   const input = document.getElementById('text-modal-input');
-  const value = input?.value.trim();
-  if (!value) { showToast("알림","내용을 입력해주세요.","#888"); return; }
-
-  const updateData = textEditMode === 'name' ? { name: value } : { status: value };
+  const value = input?.value || '';  // 빈 문자열 허용
+  
+  // 이름 수정일 때만 빈칸 체크
+  if (textEditMode === 'name' && !value.trim()) {
+    showToast("알림", "이름은 빈칸으로 둘 수 없습니다.", "#ff4757");
+    return;
+  }
+  
+  // 상태메시지는 빈칸 허용 (trim() 제거)
+  const updateValue = textEditMode === 'name' ? value.trim() : value;
+  const updateData = textEditMode === 'name' ? { name: updateValue } : { status: updateValue };
+  
   const { error } = await supabaseClient.from('profiles').update(updateData).eq('id', currentUserId);
-  if (error) { showToast("오류","저장에 실패했습니다.","#ff4757"); return; }
+  if (error) { 
+    showToast("오류", "저장에 실패했습니다.", "#ff4757"); 
+    return; 
+  }
 
-  if (textEditMode === 'name') currentUserProfile.name = value;
-  else currentUserProfile.status = value;
+  if (textEditMode === 'name') {
+    currentUserProfile.name = updateValue;
+  } else {
+    currentUserProfile.status = updateValue;  // 빈 문자열도 저장 가능
+  }
 
   syncMyProfileDOM();
   closeTextEditModal();
-  openProfileCard('me'); // 프로필 카드 즉시 갱신
+  openProfileCard('me');
   showToast("저장", textEditMode === 'name' ? "이름이 변경되었습니다." : "상태메시지가 변경되었습니다.", "#2ed573");
 }
 
@@ -1332,17 +1346,45 @@ function startGlobalRealtime() {
       if (msg.sender_id === currentUserId) return;
       if (blockedList.includes(msg.sender_id)) return;
       
+      // 내가 속한 채팅방 ID 목록
       const myRoomIds = chatRoomsList.map(r => r.id);
+      
+      // ✅ 내가 속하지 않은 방에 메시지가 오면 (나갔다가 다시 메시지 온 경우)
       if (!myRoomIds.includes(msg.room_id)) {
-        await supabaseClient.from('chat_room_members').insert({
-          room_id: msg.room_id,
-          user_id: currentUserId
-        });
+        console.log("새 메시지가 왔지만 속한 방이 아님. 재가입 시도:", msg.room_id);
+        
+        // 1. 이미 멤버인지 먼저 확인 (중복 방지)
+        const { data: existing } = await supabaseClient
+          .from('chat_room_members')
+          .select('room_id')
+          .eq('room_id', msg.room_id)
+          .eq('user_id', currentUserId)
+          .maybeSingle();
+        
+        if (!existing) {
+          // 2. 채팅방 멤버로 다시 추가
+          await supabaseClient.from('chat_room_members').insert({
+            room_id: msg.room_id,
+            user_id: currentUserId
+          });
+        }
+        
+        // 3. 채팅방 목록 새로고침
         await loadChatRooms();
         renderChats();
+        
+        // 4. 알림 표시 (상대방 이름 찾기)
+        const room = chatRoomsList.find(r => r.id === msg.room_id);
+        const sender = friendsList.find(f => f.id === msg.sender_id);
+        showChatNotification(
+          sender?.name || room?.name || '새 메시지', 
+          msg.content || '사진', 
+          sender?.avatar
+        );
         return;
       }
       
+      // 이미 속한 방이면 기존 알림 로직 실행
       if (roomOpen && currentRoom.id === msg.room_id) return;
       
       const room = chatRoomsList.find(r => r.id === msg.room_id);
