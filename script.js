@@ -1469,3 +1469,19 @@ async function resetProfileBg() {
   openProfileCard('me');
   showToast("프로필", "기본 배경으로 변경되었습니다.", "#2ed573");
 }
+
+/* 탭바 강제 표시 (임시) */
+#tab-bar {
+  display: flex !important;
+  visibility: visible !important;
+}
+
+.tab-btn {
+  display: flex !important;
+}
+
+.tab-btn i {
+  font-size: 25px !important;
+  width: auto !important;
+  height: auto !important;
+}
