@@ -1442,22 +1442,60 @@ async function triggerProfileUpload(type) {
 async function handleProfileImageUpload(inputElement, type) {
   const file = inputElement.files[0];
   if (!file || !currentUserId) return;
-  const reader = new FileReader();
-  reader.onload = async function(e) {
-    const base64 = e.target.result;
-    const updateData = type === 'avatar' ? { avatar: base64 } : { bg: base64 };
-    await supabaseClient.from('profiles').update(updateData).eq('id', currentUserId);
-    currentUserProfile[type === 'avatar' ? 'avatar' : 'bg'] = base64;
-    syncMyProfileDOM();
-    openProfileCard('me'); // 즉시 갱신
-    showToast("프로필", type === 'avatar' ? "프로필 사진이 변경되었습니다." : "배경 사진이 변경되었습니다.", "#2ed573");
-    // 친구들한테도 즉시 반영되도록 friendsList 갱신
-    friendsList.forEach(f => {
-      if (f.id === currentUserId) f.avatar = base64;
-    });
-    renderChats();
-  };
-  reader.readAsDataURL(file);
+  
+  if (!file.type.startsWith('image/')) {
+    showToast("오류", "이미지 파일만 업로드 가능합니다.", "#ff4757");
+    return;
+  }
+  
+  // 파일 크기 제한 (5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    showToast("오류", "5MB 이하의 이미지만 업로드 가능합니다.", "#ff4757");
+    return;
+  }
+  
+  // 파일명 생성
+  const ext = file.name.split('.').pop();
+  const fileName = `${type}_${currentUserId}_${Date.now()}.${ext}`;
+  
+  // 1. Storage에 업로드
+  const { error: uploadError } = await supabaseClient.storage
+    .from('chat-images')
+    .upload(fileName, file);
+  
+  if (uploadError) {
+    console.error('업로드 실패:', uploadError);
+    showToast("오류", "이미지 업로드에 실패했습니다.", "#ff4757");
+    inputElement.value = "";
+    return;
+  }
+  
+  // 2. public URL 얻기
+  const { data: urlData } = supabaseClient.storage
+    .from('chat-images')
+    .getPublicUrl(fileName);
+  
+  // 3. DB에 URL 저장
+  const updateData = type === 'avatar' ? { avatar: urlData.publicUrl } : { bg: urlData.publicUrl };
+  await supabaseClient.from('profiles').update(updateData).eq('id', currentUserId);
+  
+  // 4. 상태 업데이트
+  if (type === 'avatar') {
+    currentUserProfile.avatar = urlData.publicUrl;
+  } else {
+    currentUserProfile.bg = urlData.publicUrl;
+  }
+  
+  syncMyProfileDOM();
+  openProfileCard('me');
+  showToast("프로필", type === 'avatar' ? "프로필 사진이 변경되었습니다." : "배경 사진이 변경되었습니다.", "#2ed573");
+  
+  // friendsList 업데이트 (내 프로필 사진)
+  friendsList.forEach(f => {
+    if (f.id === currentUserId) f.avatar = currentUserProfile.avatar;
+  });
+  
+  renderChats();
   inputElement.value = "";
 }
 
@@ -1882,6 +1920,16 @@ function selectImageSource(source) {
 }
 
 async function resetProfileImage() {
+  // Storage에서 기존 파일 삭제 (선택)
+  if (currentUserProfile.avatar) {
+    const oldFileName = currentUserProfile.avatar.split('/').pop();
+    if (oldFileName) {
+      await supabaseClient.storage
+        .from('chat-images')
+        .remove([oldFileName]);
+    }
+  }
+  
   await supabaseClient.from('profiles').update({ avatar: null }).eq('id', currentUserId);
   currentUserProfile.avatar = null;
   syncMyProfileDOM();
@@ -1890,6 +1938,16 @@ async function resetProfileImage() {
 }
 
 async function resetProfileBg() {
+  // Storage에서 기존 파일 삭제 (선택)
+  if (currentUserProfile.bg) {
+    const oldFileName = currentUserProfile.bg.split('/').pop();
+    if (oldFileName) {
+      await supabaseClient.storage
+        .from('chat-images')
+        .remove([oldFileName]);
+    }
+  }
+  
   await supabaseClient.from('profiles').update({ bg: null }).eq('id', currentUserId);
   currentUserProfile.bg = null;
   openProfileCard('me');
