@@ -610,18 +610,27 @@ async function chatSwipeAction(action, roomId) {
     const isSecret = room.is_secret || false;
     
     if (isSecret) {
-      // 🔒 비밀 채팅방: 모든 메시지 deleted_for_all = true (모두에게 영구 삭제)
+      // 🔒 비밀 채팅방: 모든 메시지 deleted_for_all = true
       await supabaseClient
         .from('messages')
         .update({ deleted_for_all: true })
         .eq('room_id', roomId);
       
-      // 방 삭제
-      await supabaseClient.from('chat_rooms').delete().eq('id', roomId);
+      // 1. 채팅방 멤버 삭제
+      await supabaseClient
+        .from('chat_room_members')
+        .delete()
+        .eq('room_id', roomId);
+      
+      // 2. 채팅방 삭제
+      await supabaseClient
+        .from('chat_rooms')
+        .delete()
+        .eq('id', roomId);
       
       showToast("채팅방", "비밀 채팅방이 삭제되었습니다.", "#ff4757");
     } else {
-      // 일반 채팅방: 내 화면에서만 메시지 숨김 (deleted_for_me)
+      // 일반 채팅방: 내 화면에서만 메시지 숨김
       const { data: messages } = await supabaseClient
         .from('messages')
         .select('id, deleted_for_me')
@@ -638,7 +647,11 @@ async function chatSwipeAction(action, roomId) {
       }
       
       // 채팅방 멤버에서 제거
-      await supabaseClient.from('chat_room_members').delete().eq('room_id', roomId).eq('user_id', currentUserId);
+      await supabaseClient
+        .from('chat_room_members')
+        .delete()
+        .eq('room_id', roomId)
+        .eq('user_id', currentUserId);
       
       // 방에 아무도 없으면 방 자체도 삭제
       const { count } = await supabaseClient
