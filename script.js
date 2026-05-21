@@ -921,8 +921,8 @@ async function openProfileCard(id) {
       cardOverlay.style.backgroundColor = '#7a8188';
     }
     actionsContainer.innerHTML = `
-      <button class="pc-action-btn" onclick="triggerProfileUpload('avatar')"><i class="ti ti-photo"></i><span>사진 변경</span></button>
-      <button class="pc-action-btn" onclick="document.getElementById('bg-file-input').click()"><i class="ti ti-photo-plus"></i><span>배경 변경</span></button>
+      <button class="pc-action-btn" onclick="openImageSourceModal('avatar')"><i class="ti ti-photo"></i><span>사진 변경</span></button>
+      <button class="pc-action-btn" onclick="openImageSourceModal('bg')"><i class="ti ti-photo-plus"></i><span>배경 변경</span></button>
     `;
   } else {
     const user = friendsList.find(f => f.id === id);
@@ -1376,3 +1376,53 @@ document.getElementById('login-pw')?.addEventListener('keypress', e => { if (e.k
 document.getElementById('reg-id')?.addEventListener('keypress', e => { if (e.key === 'Enter') handleRegister(); });
 document.getElementById('reg-pw')?.addEventListener('keypress', e => { if (e.key === 'Enter') handleRegister(); });
 document.getElementById('reg-name')?.addEventListener('keypress', e => { if (e.key === 'Enter') handleRegister(); });
+
+// ============================================================
+// 프로필 이미지 선택 모달 관련 함수
+// ============================================================
+
+let currentImageType = null;
+
+function openImageSourceModal(type) {
+  currentImageType = type;
+  const modal = document.getElementById('image-source-modal');
+  if (modal) modal.classList.add('active');
+}
+
+function closeImageSourceModal() {
+  const modal = document.getElementById('image-source-modal');
+  if (modal) modal.classList.remove('active');
+  currentImageType = null;
+}
+
+function selectImageSource(source) {
+  if (source === 'gallery') {
+    if (currentImageType === 'avatar') {
+      document.getElementById('avatar-file-input').click();
+    } else if (currentImageType === 'bg') {
+      document.getElementById('bg-file-input').click();
+    }
+  } else if (source === 'default') {
+    if (currentImageType === 'avatar') {
+      resetProfileImage();
+    } else if (currentImageType === 'bg') {
+      resetProfileBg();
+    }
+  }
+  closeImageSourceModal();
+}
+
+async function resetProfileImage() {
+  await supabaseClient.from('profiles').update({ avatar: null }).eq('id', currentUserId);
+  currentUserProfile.avatar = null;
+  syncMyProfileDOM();
+  openProfileCard('me');
+  showToast("프로필", "기본 프로필 사진으로 변경되었습니다.", "#2ed573");
+}
+
+async function resetProfileBg() {
+  await supabaseClient.from('profiles').update({ bg: null }).eq('id', currentUserId);
+  currentUserProfile.bg = null;
+  openProfileCard('me');
+  showToast("프로필", "기본 배경으로 변경되었습니다.", "#2ed573");
+}
