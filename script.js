@@ -1203,23 +1203,93 @@ function checkUnreadDots() {}
 /* ============================================================
    전역 Realtime
    ============================================================ */
+// 전역 Realtime (메시지 + 프로필 변경 감지)
 let globalSubscription = null;
+
 function startGlobalRealtime() {
-  if (globalSubscription) supabaseClient.removeChannel(globalSubscription);
+  if (globalSubscription) {
+    supabaseClient.removeChannel(globalSubscription);
+  }
+  
   globalSubscription = supabaseClient
-    .channel('global-messages')
+    .channel('global-realtime')
+    // 1. 새 메시지 감지 (기존 기능)
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
       const msg = payload.new;
       if (msg.sender_id === currentUserId) return;
-      if (blockedList.includes(msg.sender_id)) return; // 차단된 사람 알림 차단
+      if (blockedList.includes(msg.sender_id)) return;
+      
       const myRoomIds = chatRoomsList.map(r => r.id);
       if (!myRoomIds.includes(msg.room_id)) return;
+      
       if (roomOpen && currentRoom.id === msg.room_id) return;
+      
       const room = chatRoomsList.find(r => r.id === msg.room_id);
       if (room?.is_muted) return;
+      
       const sender = friendsList.find(f => f.id === msg.sender_id);
       showChatNotification(sender?.name || room?.name || '누군가', msg.content || '사진', sender?.avatar);
       renderChats();
+    })
+    // 2. 프로필 변경 감지 (새로 추가!)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async (payload) => {
+      const updatedProfile = payload.new;
+      
+      // 내 프로필이 업데이트된 경우
+      if (updatedProfile.id === currentUserId) {
+        currentUserProfile = updatedProfile;
+        syncMyProfileDOM();
+        showToast("프로필", "내 프로필이 업데이트되었습니다.", "#2ed573");
+        return;
+      }
+      
+      // 친구 목록에 있는 친구의 프로필이 업데이트된 경우
+      const friendIndex = friendsList.findIndex(f => f.id === updatedProfile.id);
+      if (friendIndex !== -1) {
+        // 기존 친구 정보 업데이트
+        friendsList[friendIndex] = {
+          ...friendsList[friendIndex],
+          name: updatedProfile.name,
+          status: updatedProfile.status,
+          avatar: updatedProfile.avatar
+        };
+        
+        // 친구 목록 UI 갱신
+        renderFriends();
+        
+        // 관리 모달이 열려있으면 갱신
+        if (document.getElementById('manage-modal')?.classList.contains('active')) {
+          renderManageList();
+        }
+        
+        // 프로필 카드가 열려있고 해당 친구면 갱신
+        if (profileTargetId === updatedProfile.id) {
+          document.getElementById('pc-name').textContent = updatedProfile.name;
+          document.getElementById('pc-status').textContent = updatedProfile.status || '안녕하세요!';
+          applyAvatarStyle(document.getElementById('pc-avatar'), updatedProfile.avatar);
+        }
+        
+        // 1:1 채팅방 제목 갱신 (해당 친구와의 채팅방이 열려있을 때)
+        if (roomOpen && currentRoom.id && !currentRoom.is_group) {
+          const otherId = currentRoom.members?.find(id => id !== currentUserId);
+          if (otherId === updatedProfile.id) {
+            document.getElementById('room-title').textContent = updatedProfile.name;
+            currentRoom.name = updatedProfile.name;
+          }
+        }
+        
+        // 채팅방 목록에서 해당 친구와의 1:1 채팅방 이름 갱신
+        const targetRoom = chatRoomsList.find(room => 
+          !room.is_group && room.members?.includes(updatedProfile.id) && room.members?.includes(currentUserId)
+        );
+        if (targetRoom) {
+          targetRoom.name = updatedProfile.name;
+          renderChats();
+        }
+        
+        // 토스트 알림 (선택사항)
+        showToast("프로필 변경", `${updatedProfile.name}님의 프로필이 업데이트되었습니다.`, "#5352ed");
+      }
     })
     .subscribe();
 }
