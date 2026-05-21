@@ -1360,7 +1360,8 @@ function setTheme(theme) {
 }
 
 function updateThemeCards() {
-  ['white','dark'].forEach(t => {
+  const themes = ['white', 'dark', 'pokemon'];  // 'pokemon' 추가
+  themes.forEach(t => {
     const card = document.getElementById('theme-' + t);
     if (card) card.classList.toggle('selected', currentTheme === t);
   });
