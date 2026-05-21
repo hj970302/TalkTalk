@@ -822,7 +822,7 @@ async function handleClipFile(inputElement) {
     showToast("오류", "메시지 저장에 실패했습니다.", "#ff4757");
   } else {
     appendMessageToUI(data);
-    renderChats();
+    if (!roomOpen) renderChats();
   }
   
   inputElement.value = "";
@@ -1223,15 +1223,13 @@ function selectEmot(emot) {
   document.getElementById('emoticon-drawer')?.classList.remove('active');
 }
 function switchTab(tab) {
-  // 채팅방이 열려있으면 탭 전환 불가
-  if (roomOpen) return;  // ← 추가
-
+  if (roomOpen) return;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   const map = { friends: 'screen-friends', chats: 'screen-chats', more: 'screen-more' };
   document.getElementById(map[tab])?.classList.add('active');
   document.getElementById('tab-' + tab)?.classList.add('active');
-  document.getElementById('tab-bar').style.display = 'flex';  // ← 추가
+  document.getElementById('tab-bar').style.display = 'flex';
   currentTab = tab;
 }
 function closeRoom() {
@@ -1280,7 +1278,7 @@ function startGlobalRealtime() {
       
       const sender = friendsList.find(f => f.id === msg.sender_id);
       showChatNotification(sender?.name || room?.name || '누군가', msg.content || '사진', sender?.avatar);
-      renderChats();
+      if (!roomOpen) renderChats();
     })
     // 2. 프로필 변경 감지 (새로 추가!)
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async (payload) => {
