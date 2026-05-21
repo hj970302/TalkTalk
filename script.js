@@ -85,7 +85,7 @@ function showToast(title, message, color='#333') {
   tc.appendChild(t);
   setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 200); }, 2500);
 }
-function showChatNotification(name, text, avatarUrl) {
+function showChatNotification(name, text, avatarUrl, roomId) {
   const tc = document.getElementById('toast-container');
   if (!tc) return;
   const t = document.createElement('div');
@@ -94,8 +94,8 @@ function showChatNotification(name, text, avatarUrl) {
   t.innerHTML = `<div class="toast-avatar avatar-base" ${avStyle}>${avatarUrl?'':'<i class="ti ti-user"></i>'}</div>
                  <div class="toast-body"><div class="toast-name">${name}</div><div class="toast-msg">${text}</div></div>`;
   t.onclick = () => {
-    const room = chatRoomsList.find(r => r.name === name);
-    if (room) openRoomFromData(room.id);
+    // ✅ roomId로 직접 채팅방 열기 (이름으로 찾지 않음)
+    if (roomId) openRoomFromData(roomId);
     t.remove();
   };
   tc.appendChild(t);
@@ -721,110 +721,69 @@ async function chatSwipeAction(action, roomId) {
    채팅방 열기
    ============================================================ */
 async function openRoomWithFriend(friendId) {
-  // 1. 이미 존재하는 1:1 채팅방 찾기 (중복 방지 - 더 정확하게)
-  const { data: existingRoom } = await supabaseClient
+  // 1. 상대방이 속한 1:1 채팅방 조회 (친구 여부 상관없이)
+  const { data: friendRooms } = await supabaseClient
     .from('chat_room_members')
     .select('room_id, chat_rooms!inner(*)')
-    .eq('user_id', currentUserId)
+    .eq('user_id', friendId)
     .eq('chat_rooms.is_group', false);
   
-  const myRoomIds = existingRoom?.map(r => r.room_id) || [];
-  
-  if (myRoomIds.length > 0) {
-    const { data: sharedRooms } = await supabaseClient
-      .from('chat_room_members')
-      .select('room_id')
-      .eq('user_id', friendId)
-      .in('room_id', myRoomIds);
-    
-    if (sharedRooms && sharedRooms.length > 0) {
-      // 기존 방이 있다면 그 방을 사용
-      const { data: roomData } = await supabaseClient
-        .from('chat_rooms')
-        .select('*')
-        .eq('id', sharedRooms[0].room_id)
-        .single();
-      
-      if (roomData) {
-        // 멤버 정보 추가
-        const { data: members } = await supabaseClient
-          .from('chat_room_members')
-          .select('user_id')
-          .eq('room_id', roomData.id);
-        roomData.members = members?.map(m => m.user_id) || [];
-        
-        // 이미 목록에 없으면 추가
-        if (!chatRoomsList.find(r => r.id === roomData.id)) {
-          chatRoomsList.push(roomData);
-        }
-        openRoomFromData(roomData.id);
-        return;
-      }
-    }
-  }
-  
-  // 2. 정말 없으면 새로 생성 (중복 생성 방지를 위한 최종 확인)
-  const friend = friendsList.find(f => f.id === friendId);
-  if (!friend) { 
-    showToast("오류","친구 정보를 찾을 수 없습니다.","#ff4757"); 
-    return; 
-  }
-  
-  // ✅ 추가: 같은 이름의 1:1 채팅방이 이미 존재하는지 최종 확인
-  const { data: duplicateCheck } = await supabaseClient
-    .from('chat_rooms')
-    .select('id')
-    .eq('name', friend.name)
-    .eq('is_group', false)
-    .maybeSingle();
-  
-  if (duplicateCheck) {
-    // 이미 있는 방이면 멤버인지 확인 후 추가
-    const { data: isMember } = await supabaseClient
+  // 2. 그중에서 내가 속하지 않은 방이 있는지 확인 (내가 나간 방)
+  let targetRoom = null;
+  for (const fr of friendRooms || []) {
+    const { data: members } = await supabaseClient
       .from('chat_room_members')
       .select('user_id')
-      .eq('room_id', duplicateCheck.id)
-      .eq('user_id', currentUserId)
-      .maybeSingle();
+      .eq('room_id', fr.room_id);
     
-    if (!isMember) {
-      await supabaseClient.from('chat_room_members').insert([
-        { room_id: duplicateCheck.id, user_id: currentUserId },
-        { room_id: duplicateCheck.id, user_id: friendId }
-      ]);
-    }
+    const memberIds = members?.map(m => m.user_id) || [];
     
-    // 방 정보 가져오기
-    const { data: roomData } = await supabaseClient
-      .from('chat_rooms')
-      .select('*')
-      .eq('id', duplicateCheck.id)
-      .single();
-    
-    if (roomData) {
-      const { data: members } = await supabaseClient
-        .from('chat_room_members')
-        .select('user_id')
-        .eq('room_id', roomData.id);
-      roomData.members = members?.map(m => m.user_id) || [];
-      
-      if (!chatRoomsList.find(r => r.id === roomData.id)) {
-        chatRoomsList.push(roomData);
-      }
-      openRoomFromData(roomData.id);
-      return;
+    if (!memberIds.includes(currentUserId)) {
+      targetRoom = {
+        ...fr.chat_rooms,
+        members: memberIds
+      };
+      break;
     }
   }
   
-  // 3. 진짜 없으면 새로 생성
+  // 3. 나간 방이 있으면 그 방으로 재입장
+  if (targetRoom) {
+    await supabaseClient.from('chat_room_members').insert({
+      room_id: targetRoom.id,
+      user_id: currentUserId
+    });
+    
+    targetRoom.members.push(currentUserId);
+    
+    if (!chatRoomsList.find(r => r.id === targetRoom.id)) {
+      chatRoomsList.push(targetRoom);
+    }
+    openRoomFromData(targetRoom.id);
+    return;
+  }
+  
+  // 4. 상대방 정보 가져오기 (프로필에서 직접 조회)
+  const { data: friendProfile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('id, name, username, avatar')
+    .eq('id', friendId)
+    .single();
+  
+  if (profileError || !friendProfile) {
+    showToast("오류", "상대방 정보를 찾을 수 없습니다.", "#ff4757");
+    return;
+  }
+  
+  // 5. 새 채팅방 생성 (친구 여부 상관없이)
   const { data: newRoom, error } = await supabaseClient
     .from('chat_rooms')
-    .insert({ name: friend.name, is_group: false, created_by: currentUserId })
+    .insert({ name: friendProfile.name, is_group: false, created_by: currentUserId })
     .select()
     .single();
   
   if (error) { 
-    showToast("오류","채팅방을 만들 수 없습니다.","#ff4757"); 
+    showToast("오류", "채팅방을 만들 수 없습니다.", "#ff4757"); 
     return; 
   }
   
@@ -836,9 +795,7 @@ async function openRoomWithFriend(friendId) {
   newRoom.members = [currentUserId, friendId];
   chatRoomsList.push(newRoom);
   openRoomFromData(newRoom.id);
-}
-
-async function openRoomFromData(roomId) {
+}async function openRoomFromData(roomId) {
   let room = chatRoomsList.find(r => r.id === roomId);
   if (!room) {
     const { data: roomData } = await supabaseClient.from('chat_rooms').select('*').eq('id', roomId).single();
@@ -882,7 +839,7 @@ async function openRoomFromData(roomId) {
       if (blockedList.includes(msg.sender_id)) return;
       if (!roomOpen || currentRoom.id !== room.id) {
         const sender = friendsList.find(f => f.id === msg.sender_id);
-        showChatNotification(sender?.name || '누군가', msg.content || '사진', sender?.avatar);
+        showChatNotification(sender?.name || '누군가', msg.content || '사진', sender?.avatar, msg.room_id);
       } else {
         appendMessageToUI(msg);
       }
@@ -1067,32 +1024,11 @@ function makeMetaEl() {
    메시지 전송
    ============================================================ */
 async function sendPushNotification(text) {
-  try {
-    const otherIds = currentRoom.members?.filter(id => id !== currentUserId) || [];
-    if (otherIds.length === 0) return;
-
-    const { data: profiles } = await supabaseClient
-      .from('profiles')
-      .select('onesignal_player_id')
-      .in('id', otherIds);
-
-    const playerIds = profiles?.map(p => p.onesignal_player_id).filter(Boolean) || [];
-    if (playerIds.length === 0) return;
-
-    await fetch('https://yrndqghsdtxoajgxvqrv.supabase.co/functions/v1/send-notification', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        player_ids: playerIds,
-        title: currentUserProfile?.name || '톡톡',
-        message: text,
-        url: 'https://talk-talk-phi.vercel.app'
-      })
-    });
-  } catch(e) {
-    console.error('알림 전송 실패:', e);
-  }
+  // 알림 기능 임시 비활성화 (채팅부터 살리자)
+  console.log('알림 전송 스킵:', text);
+  return;
 }
+
 async function sendMsg() {
   const input = document.getElementById('msg-input');
   const text = input?.value.trim();
@@ -1412,22 +1348,60 @@ async function triggerProfileUpload(type) {
 async function handleProfileImageUpload(inputElement, type) {
   const file = inputElement.files[0];
   if (!file || !currentUserId) return;
-  const reader = new FileReader();
-  reader.onload = async function(e) {
-    const base64 = e.target.result;
-    const updateData = type === 'avatar' ? { avatar: base64 } : { bg: base64 };
-    await supabaseClient.from('profiles').update(updateData).eq('id', currentUserId);
-    currentUserProfile[type === 'avatar' ? 'avatar' : 'bg'] = base64;
-    syncMyProfileDOM();
-    openProfileCard('me'); // 즉시 갱신
-    showToast("프로필", type === 'avatar' ? "프로필 사진이 변경되었습니다." : "배경 사진이 변경되었습니다.", "#2ed573");
-    // 친구들한테도 즉시 반영되도록 friendsList 갱신
-    friendsList.forEach(f => {
-      if (f.id === currentUserId) f.avatar = base64;
-    });
-    renderChats();
-  };
-  reader.readAsDataURL(file);
+  
+  if (!file.type.startsWith('image/')) {
+    showToast("오류", "이미지 파일만 업로드 가능합니다.", "#ff4757");
+    return;
+  }
+  
+  // 파일 크기 제한 (5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    showToast("오류", "5MB 이하의 이미지만 업로드 가능합니다.", "#ff4757");
+    return;
+  }
+  
+  // 파일명 생성
+  const ext = file.name.split('.').pop();
+  const fileName = `${type}_${currentUserId}_${Date.now()}.${ext}`;
+  
+  // 1. Storage에 업로드
+  const { error: uploadError } = await supabaseClient.storage
+    .from('chat-images')
+    .upload(fileName, file);
+  
+  if (uploadError) {
+    console.error('업로드 실패:', uploadError);
+    showToast("오류", "이미지 업로드에 실패했습니다.", "#ff4757");
+    inputElement.value = "";
+    return;
+  }
+  
+  // 2. public URL 얻기
+  const { data: urlData } = supabaseClient.storage
+    .from('chat-images')
+    .getPublicUrl(fileName);
+  
+  // 3. DB에 URL 저장
+  const updateData = type === 'avatar' ? { avatar: urlData.publicUrl } : { bg: urlData.publicUrl };
+  await supabaseClient.from('profiles').update(updateData).eq('id', currentUserId);
+  
+  // 4. 상태 업데이트
+  if (type === 'avatar') {
+    currentUserProfile.avatar = urlData.publicUrl;
+  } else {
+    currentUserProfile.bg = urlData.publicUrl;
+  }
+  
+  syncMyProfileDOM();
+  openProfileCard('me');
+  showToast("프로필", type === 'avatar' ? "프로필 사진이 변경되었습니다." : "배경 사진이 변경되었습니다.", "#2ed573");
+  
+  // friendsList 업데이트 (내 프로필 사진)
+  friendsList.forEach(f => {
+    if (f.id === currentUserId) f.avatar = currentUserProfile.avatar;
+  });
+  
+  renderChats();
   inputElement.value = "";
 }
 
@@ -1724,10 +1698,66 @@ function startGlobalRealtime() {
       
       const sender = friendsList.find(f => f.id === msg.sender_id);
       showChatNotification(sender?.name || room?.name || '누군가', msg.content || '사진', sender?.avatar);
-      if (!roomOpen) renderChats();
+      renderChats();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async (payload) => {
-      // ... 기존 프로필 업데이트 코드 ...
+      const updatedProfile = payload.new;
+      
+      const friendIndex = friendsList.findIndex(f => f.id === updatedProfile.id);
+      if (friendIndex !== -1) {
+        const old = friendsList[friendIndex];
+        const changed = old.name !== updatedProfile.name || old.status !== updatedProfile.status || old.avatar !== updatedProfile.avatar;
+
+        friendsList[friendIndex] = {
+          ...friendsList[friendIndex],
+          name: updatedProfile.name,
+          status: updatedProfile.status,
+          avatar: updatedProfile.avatar
+        };
+        
+        renderFriends();
+        
+        if (document.getElementById('manage-modal')?.classList.contains('active')) {
+          renderManageList();
+        }
+        
+        if (profileTargetId === updatedProfile.id) {
+          document.getElementById('pc-name').textContent = updatedProfile.name;
+          document.getElementById('pc-status').textContent = updatedProfile.status || '';
+          applyAvatarStyle(document.getElementById('pc-avatar'), updatedProfile.avatar);
+        }
+        
+        if (roomOpen && currentRoom.id && !currentRoom.is_group) {
+          const otherId = currentRoom.members?.find(id => id !== currentUserId);
+          if (otherId === updatedProfile.id) {
+            document.getElementById('room-title').textContent = updatedProfile.name;
+            currentRoom.name = updatedProfile.name;
+          }
+        }
+        
+        const targetRoom = chatRoomsList.find(room => 
+          !room.is_group && room.members?.includes(updatedProfile.id) && room.members?.includes(currentUserId)
+        );
+        if (targetRoom) {
+          targetRoom.name = updatedProfile.name;
+          renderChats();
+        }
+
+        if (changed) showToast("프로필 변경", `${updatedProfile.name}님의 프로필이 업데이트되었습니다.`, "#5352ed");
+      }
+    })
+    // ✅ 채팅방 삭제 감지 (비밀 채팅방용)
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_rooms' }, (payload) => {
+      const deletedRoomId = payload.old.id;
+      console.log('채팅방 삭제 감지:', deletedRoomId);
+      
+      chatRoomsList = chatRoomsList.filter(r => r.id !== deletedRoomId);
+      renderChats();
+      
+      if (roomOpen && currentRoom.id === deletedRoomId) {
+        closeRoom();
+        showToast("알림", "비밀 채팅방이 삭제되었습니다.", "#ff4757");
+      }
     })
     .subscribe();
 }
@@ -1852,6 +1882,16 @@ function selectImageSource(source) {
 }
 
 async function resetProfileImage() {
+  // Storage에서 기존 파일 삭제 (선택)
+  if (currentUserProfile.avatar) {
+    const oldFileName = currentUserProfile.avatar.split('/').pop();
+    if (oldFileName) {
+      await supabaseClient.storage
+        .from('chat-images')
+        .remove([oldFileName]);
+    }
+  }
+  
   await supabaseClient.from('profiles').update({ avatar: null }).eq('id', currentUserId);
   currentUserProfile.avatar = null;
   syncMyProfileDOM();
@@ -1860,6 +1900,16 @@ async function resetProfileImage() {
 }
 
 async function resetProfileBg() {
+  // Storage에서 기존 파일 삭제 (선택)
+  if (currentUserProfile.bg) {
+    const oldFileName = currentUserProfile.bg.split('/').pop();
+    if (oldFileName) {
+      await supabaseClient.storage
+        .from('chat-images')
+        .remove([oldFileName]);
+    }
+  }
+  
   await supabaseClient.from('profiles').update({ bg: null }).eq('id', currentUserId);
   currentUserProfile.bg = null;
   openProfileCard('me');
