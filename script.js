@@ -566,14 +566,27 @@ async function chatSwipeAction(action, roomId) {
   } else if (action === 'leave') {
     if (!confirm("채팅방에서 나가시겠습니까? 나가면 대화 내용이 삭제됩니다.")) return;
     
-    // 1. 내가 보낸 메시지 삭제
-    await supabaseClient.from('messages').delete().eq('room_id', roomId).eq('sender_id', currentUserId);
+    // 1. 모든 메시지에 내 ID를 deleted_for_me 배열에 추가 (내 화면에서 숨김)
+    const { data: messages } = await supabaseClient
+      .from('messages')
+      .select('id, deleted_for_me')
+      .eq('room_id', roomId);
+    
+    for (const msg of messages) {
+      const currentDeleted = msg.deleted_for_me || [];
+      if (!currentDeleted.includes(currentUserId)) {
+        await supabaseClient
+          .from('messages')
+          .update({ deleted_for_me: [...currentDeleted, currentUserId] })
+          .eq('id', msg.id);
+      }
+    }
     
     // 2. 채팅방 멤버에서 제거
     await supabaseClient.from('chat_room_members').delete().eq('room_id', roomId).eq('user_id', currentUserId);
     
-    // 3. 방에 아무도 없으면 방 자체도 삭제 (선택 사항)
-    const { data: remainingMembers, count } = await supabaseClient
+    // 3. 방에 아무도 없으면 방 자체도 삭제
+    const { count } = await supabaseClient
       .from('chat_room_members')
       .select('*', { count: 'exact', head: true })
       .eq('room_id', roomId);
@@ -583,7 +596,7 @@ async function chatSwipeAction(action, roomId) {
     }
     
     chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
-    showToast("채팅방", "채팅방에서 나갔습니다. 내 대화 내용이 삭제되었습니다.", "#ff4757");
+    showToast("채팅방", "채팅방에서 나갔습니다. 대화 내용이 삭제되었습니다.", "#ff4757");
     renderChats();
   }
 }
@@ -668,10 +681,7 @@ async function openRoomFromData(roomId) {
     })
     .subscribe();
 
-  await loadMessages(room.id);
-}
-
-async function loadMessages(roomId) {
+ async function loadMessages(roomId) {
   const container = document.getElementById('room-messages');
   if (!container) return;
   
@@ -700,8 +710,14 @@ async function loadMessages(roomId) {
   container.innerHTML = `<div class="date-sep"><span>${dateStr()}</span></div>`;
   
   for (const msg of messages || []) {
+    // 삭제 조건 체크
     if (msg.deleted_for_all) continue;
     if (blockedList.includes(msg.sender_id)) continue;
+    
+    // 👇 추가: 내가 나간 채팅방에서 메시지 숨김 처리
+    const deletedForMe = msg.deleted_for_me || [];
+    if (deletedForMe.includes(currentUserId)) continue;
+    
     appendMessageToUI(msg);
   }
   
