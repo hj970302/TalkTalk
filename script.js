@@ -788,10 +788,23 @@ function appendMessageToUI(msg) {
 function makeBubbleEl(msg, isMine) {
   const bubble = document.createElement('div');
   bubble.className = `bubble ${isMine ? 'mine' : 'other'}`;
+  
   if (msg.type === 'image' && msg.image_url) {
     bubble.classList.add('image-bubble');
     bubble.innerHTML = `<img src="${msg.image_url}" alt="이미지" style="max-width:200px; max-height:200px; border-radius:8px;">`;
-    bubble.onclick = () => openImageViewer(msg.image_url, msg.id);
+    // 이미지도 길게 누르면 메뉴 뜨도록 추가
+    bubble.oncontextmenu = (e) => {
+      e.preventDefault();
+      triggerBubbleMenu(e, msg.id);
+    };
+    bubble.addEventListener('touchstart', (e) => {
+      let timer;
+      timer = setTimeout(() => {
+        triggerBubbleMenu(e, msg.id);
+      }, 500);
+      bubble.addEventListener('touchend', () => clearTimeout(timer));
+      bubble.addEventListener('touchmove', () => clearTimeout(timer));
+    });
   } else {
     bubble.textContent = msg.content || '사진';
     bubble.onclick = (e) => { e.stopPropagation(); triggerBubbleMenu(e, msg.id); };
@@ -940,25 +953,53 @@ function triggerBubbleMenu(e, messageId) {
   selectedMessageId = messageId;
   const menu = document.getElementById('bubble-context-menu');
   if (menu) {
-    menu.style.top = `${e.pageY}px`;
-    menu.style.left = `${Math.min(e.pageX, window.innerWidth - 130)}px`;
+    let x = e.pageX || e.touches?.[0]?.pageX || 0;
+    let y = e.pageY || e.touches?.[0]?.pageY || 0;
+    menu.style.top = `${y}px`;
+    menu.style.left = `${Math.min(x, window.innerWidth - 130)}px`;
     menu.classList.add('active');
   }
 }
 async function handleBubbleDelete(type) {
   if (!selectedMessageId) return;
   document.getElementById('bubble-context-menu')?.classList.remove('active');
+  
   if (type === 'all') {
-    await supabaseClient.from('messages').update({ deleted_for_all: true }).eq('id', selectedMessageId).eq('sender_id', currentUserId);
+    // 모두에게 삭제
+    const { error } = await supabaseClient
+      .from('messages')
+      .update({ deleted_for_all: true })
+      .eq('id', selectedMessageId)
+      .eq('sender_id', currentUserId);
+    
+    if (error) {
+      showToast("오류", "삭제에 실패했습니다.", "#ff4757");
+      return;
+    }
+    showToast("알림", "메시지가 모두에게 삭제되었습니다.", "#2ed573");
   } else {
-    showToast("알림","나에게만 삭제되었습니다.","#555");
+    // 나에게만 삭제 (deleted_for_me 배열에 내 ID 추가)
+    const { data: msg } = await supabaseClient
+      .from('messages')
+      .select('deleted_for_me')
+      .eq('id', selectedMessageId)
+      .single();
+    
+    const deletedForMe = msg?.deleted_for_me || [];
+    if (!deletedForMe.includes(currentUserId)) {
+      await supabaseClient
+        .from('messages')
+        .update({ deleted_for_me: [...deletedForMe, currentUserId] })
+        .eq('id', selectedMessageId);
+    }
+    showToast("알림", "나에게만 삭제되었습니다.", "#888");
   }
-  if (roomOpen && currentRoom.id) await loadMessages(currentRoom.id);
+  
+  // 메시지 목록 새로고침
+  if (roomOpen && currentRoom.id) {
+    await loadMessages(currentRoom.id);
+  }
 }
-document.addEventListener('click', e => {
-  if (!e.target.closest('.bubble') && !e.target.closest('.bubble-menu'))
-    document.getElementById('bubble-context-menu')?.classList.remove('active');
-});
 
 /* ============================================================
    채팅방 검색
