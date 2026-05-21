@@ -825,8 +825,6 @@ function triggerClip() {
   document.getElementById('clip-file-input')?.click(); 
 }
 
-function triggerClip() { document.getElementById('clip-file-input')?.click(); }
-
 /* ============================================================
    말풍선 메뉴
    ============================================================ */
