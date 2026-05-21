@@ -482,6 +482,7 @@ async function renderChats() {
       .eq('room_id', room.id).order('created_at', { ascending: false }).limit(1);
 
     const lastChat = lastMsg?.[0];
+    if(!lastChat) continue; //
     let displayMsg = lastChat
       ? (lastChat.type === 'image' ? '📸 사진' : (lastChat.content?.substring(0, 30) || ''))
       : '대화 내역 없음';
