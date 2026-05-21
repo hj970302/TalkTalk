@@ -146,6 +146,7 @@ async function loadUserData(userId) {
   renderFriends();
   renderChats();
   checkUnreadDots();
+  startGlobalRealtime();
 }
 
 async function loadFriends() {
@@ -435,72 +436,89 @@ function makeFriendItemHTML(f) {
 /* ==========================================================================
    스와이프 이벤트
    ========================================================================== */
-function attachSwipeToItem(wrapper) {
-  let startX = 0, startY = 0, isDragging = false, isHorizontal = null;
-  const SWIPE_THRESHOLD = 40;
-  const SWIPE_WIDTH = 212;
-
-  function onStart(x, y) {
-    startX = x; startY = y;
-    isDragging = true; isHorizontal = null;
-  }
-  function onMove(x, y) {
-    if (!isDragging) return;
-    const dx = x - startX;
-    const dy = y - startY;
-    if (isHorizontal === null) {
-      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
-        isHorizontal = Math.abs(dx) > Math.abs(dy);
-      }
-    }
-    if (!isHorizontal) return;
-  }
-  function onEnd(x) {
-    if (!isDragging || !isHorizontal) { isDragging = false; return; }
-    isDragging = false;
-    const dx = x - startX;
-    const isSwiped = wrapper.classList.contains('swiped');
-    if (!isSwiped && dx < -SWIPE_THRESHOLD) {
-      // 다른 열린 것 닫기
-      document.querySelectorAll('.chat-item-wrapper.swiped').forEach(el => {
-        if (el !== wrapper) el.classList.remove('swiped');
-      });
-      wrapper.classList.add('swiped');
-    } else if (isSwiped && dx > SWIPE_THRESHOLD) {
-      wrapper.classList.remove('swiped');
-    }
-  }
-
-  // 터치
-  wrapper.addEventListener('touchstart', e => {
-    onStart(e.touches[0].clientX, e.touches[0].clientY);
-  }, { passive: true });
-  wrapper.addEventListener('touchmove', e => {
-    onMove(e.touches[0].clientX, e.touches[0].clientY);
-    if (isHorizontal) e.preventDefault();
-  }, { passive: false });
-  wrapper.addEventListener('touchend', e => {
-    onEnd(e.changedTouches[0].clientX);
-  });
-
-  // 마우스 (데스크톱 테스트용)
-  wrapper.addEventListener('mousedown', e => {
-    onStart(e.clientX, e.clientY);
-  });
-  window.addEventListener('mousemove', e => {
-    if (isDragging) onMove(e.clientX, e.clientY);
-  });
-  window.addEventListener('mouseup', e => {
-    if (isDragging) onEnd(e.clientX);
+function closeAllSwipes(except) {
+  document.querySelectorAll('.chat-item-wrapper.swiped').forEach(el => {
+    if (el !== except) el.classList.remove('swiped');
   });
 }
 
-// 스와이프 메뉴 밖 터치하면 닫기
+function attachSwipeToItem(wrapper) {
+  let startX = 0, startY = 0;
+  let isSwiping = false;
+  let dirLocked = false; // 방향 확정됐는지
+  let isHoriz = false;
+  const MIN_SWIPE = 30;
+
+  wrapper.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    isSwiping = true;
+    dirLocked = false;
+    isHoriz = false;
+  }, { passive: true });
+
+  wrapper.addEventListener('touchmove', e => {
+    if (!isSwiping) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+
+    if (!dirLocked && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+      isHoriz = Math.abs(dx) > Math.abs(dy);
+      dirLocked = true;
+    }
+    if (isHoriz) e.preventDefault(); // 수평 스크롤 방지
+  }, { passive: false });
+
+  wrapper.addEventListener('touchend', e => {
+    if (!isSwiping || !dirLocked || !isHoriz) { isSwiping = false; return; }
+    isSwiping = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const swiped = wrapper.classList.contains('swiped');
+
+    if (!swiped && dx < -MIN_SWIPE) {
+      closeAllSwipes(wrapper);
+      wrapper.classList.add('swiped');
+    } else if (swiped && dx > MIN_SWIPE) {
+      wrapper.classList.remove('swiped');
+    }
+  }, { passive: true });
+
+  // 데스크톱 마우스 지원
+  let mouseDown = false;
+  wrapper.addEventListener('mousedown', e => {
+    startX = e.clientX; startY = e.clientY;
+    mouseDown = true; dirLocked = false; isHoriz = false;
+  });
+  document.addEventListener('mousemove', e => {
+    if (!mouseDown) return;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    if (!dirLocked && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+      isHoriz = Math.abs(dx) > Math.abs(dy);
+      dirLocked = true;
+    }
+  });
+  document.addEventListener('mouseup', e => {
+    if (!mouseDown || !dirLocked || !isHoriz) { mouseDown = false; return; }
+    mouseDown = false;
+    const dx = e.clientX - startX;
+    const swiped = wrapper.classList.contains('swiped');
+    if (!swiped && dx < -MIN_SWIPE) {
+      closeAllSwipes(wrapper);
+      wrapper.classList.add('swiped');
+    } else if (swiped && dx > MIN_SWIPE) {
+      wrapper.classList.remove('swiped');
+    }
+  });
+}
+
+// 스와이프 영역 밖 터치 시 닫기
 document.addEventListener('touchstart', e => {
-  if (!e.target.closest('.chat-item-wrapper')) {
-    document.querySelectorAll('.chat-item-wrapper.swiped').forEach(el => el.classList.remove('swiped'));
-  }
+  if (!e.target.closest('.chat-item-wrapper')) closeAllSwipes(null);
 }, { passive: true });
+document.addEventListener('mousedown', e => {
+  if (!e.target.closest('.chat-item-wrapper')) closeAllSwipes(null);
+});
 
 /* ==========================================================================
    채팅 목록 렌더링
@@ -727,10 +745,14 @@ async function loadMessages(roomId) {
 function appendMessageToUI(msg) {
   const container = document.getElementById('room-messages');
   if (!container) return;
-  
+
+  // 중복 방지
+  if (msg.id && container.querySelector(`[data-msg-id="${msg.id}"]`)) return;
+
   const isMine = msg.sender_id === currentUserId;
   const row = document.createElement('div');
   row.className = `msg-row ${isMine ? 'mine' : 'other'}`;
+  if (msg.id) row.setAttribute('data-msg-id', msg.id);
   
   const bwrap = document.createElement('div');
   bwrap.className = 'bwrap';
@@ -1076,9 +1098,40 @@ function clearSearch() {
   if (document.getElementById('friend-search-input')) document.getElementById('friend-search-input').value = '';
   renderFriends();
 }
-function checkUnreadDots() {
-  // TODO: 읽지 않은 메시지 수 계산
+// 앱 전체 알림용 Realtime 구독 (채팅방 밖에서도 알림 수신)
+let globalSubscription = null;
+function startGlobalRealtime() {
+  if (globalSubscription) {
+    supabaseClient.removeChannel(globalSubscription);
+  }
+  globalSubscription = supabaseClient
+    .channel('global-messages')
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'messages' },
+      (payload) => {
+        const msg = payload.new;
+        if (msg.sender_id === currentUserId) return;
+
+        const myRoomIds = chatRoomsList.map(r => r.id);
+        if (!myRoomIds.includes(msg.room_id)) return;
+
+        // 현재 열린 채팅방 메시지면 → appendMessageToUI가 방 구독에서 처리
+        if (roomOpen && currentRoom.id === msg.room_id) return;
+
+        // 다른 방 메시지 → 알림
+        const room = chatRoomsList.find(r => r.id === msg.room_id);
+        if (room?.is_muted) return;
+        const sender = friendsList.find(f => f.id === msg.sender_id);
+        showChatNotification(sender?.name || room?.name || '누군가', msg.content || '사진', sender?.avatar);
+        renderChats();
+      }
+    )
+    .subscribe((status) => {
+      console.log('[전체알림] 구독 상태:', status);
+    });
 }
+
+function checkUnreadDots() {}
 async function chatSwipeAction(action, roomId, btnEl) {
   const room = chatRoomsList.find(r => r.id === roomId);
   if (!room) return;
