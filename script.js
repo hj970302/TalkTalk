@@ -721,64 +721,83 @@ async function chatSwipeAction(action, roomId) {
    채팅방 열기
    ============================================================ */
 async function openRoomWithFriend(friendId) {
-  // 1. 상대방이 속한 1:1 채팅방 조회
-  const { data: friendRooms } = await supabaseClient
-    .from('chat_room_members')
-    .select('room_id, chat_rooms!inner(*)')
-    .eq('user_id', friendId)
-    .eq('chat_rooms.is_group', false);
-  
-  // 2. 내가 나간 방이 있는지 확인
-  let targetRoom = null;
-  for (const fr of friendRooms || []) {
-    const { data: members } = await supabaseClient
+  // 1. 내가 상대방과 이미 가지고 있는 1:1 채팅방 찾기 (간단한 방법)
+  const { data: existingRoom } = await supabaseClient
+    .from('chat_rooms')
+    .select(`
+      id, name, is_group, created_by,
+      chat_room_members!inner(user_id)
+    `)
+    .eq('is_group', false)
+    .eq('chat_room_members.user_id', currentUserId)
+    .in('id', supabaseClient
       .from('chat_room_members')
-      .select('user_id')
-      .eq('room_id', fr.room_id);
+      .select('room_id')
+      .eq('user_id', friendId)
+      .then(res => res.data?.map(r => r.room_id) || [])
+    );
+  
+  // 더 간단한 방법: 두 번 쿼리
+  // 1) 내가 속한 1:1 채팅방 ID들
+  const { data: myRooms } = await supabaseClient
+    .from('chat_room_members')
+    .select('room_id')
+    .eq('user_id', currentUserId);
+  
+  const myRoomIds = myRooms?.map(r => r.room_id) || [];
+  
+  if (myRoomIds.length > 0) {
+    // 2) 상대방도 속한 방 찾기
+    const { data: sharedRooms } = await supabaseClient
+      .from('chat_room_members')
+      .select('room_id')
+      .eq('user_id', friendId)
+      .in('room_id', myRoomIds);
     
-    const memberIds = members?.map(m => m.user_id) || [];
-    
-    if (!memberIds.includes(currentUserId)) {
-      targetRoom = {
-        ...fr.chat_rooms,
-        members: memberIds
-      };
-      break;
+    if (sharedRooms && sharedRooms.length > 0) {
+      // 기존 방이 있다면 그 방 사용
+      const { data: roomData } = await supabaseClient
+        .from('chat_rooms')
+        .select('*')
+        .eq('id', sharedRooms[0].room_id)
+        .single();
+      
+      if (roomData) {
+        // 멤버 정보 추가
+        const { data: members } = await supabaseClient
+          .from('chat_room_members')
+          .select('user_id')
+          .eq('room_id', roomData.id);
+        roomData.members = members?.map(m => m.user_id) || [];
+        
+        if (!chatRoomsList.find(r => r.id === roomData.id)) {
+          chatRoomsList.push(roomData);
+        }
+        openRoomFromData(roomData.id);
+        return;
+      }
     }
   }
   
-  // 3. 나간 방이 있으면 재입장
-  if (targetRoom) {
-    await supabaseClient.from('chat_room_members').insert({
-      room_id: targetRoom.id,
-      user_id: currentUserId
-    });
-    
-    targetRoom.members.push(currentUserId);
-    
-    if (!chatRoomsList.find(r => r.id === targetRoom.id)) {
-      chatRoomsList.push(targetRoom);
+  // 3. 기존 방이 없으면 새로 생성
+  const friend = friendsList.find(f => f.id === friendId);
+  if (!friend) {
+    // 친구 목록에 없으면 프로필에서 직접 조회
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('name')
+      .eq('id', friendId)
+      .single();
+    if (!profile) {
+      showToast("오류", "상대방 정보를 찾을 수 없습니다.", "#ff4757");
+      return;
     }
-    openRoomFromData(targetRoom.id);
-    return;
+    friend = { id: friendId, name: profile.name };
   }
   
-  // 4. 상대방 정보 가져오기
-  const { data: friendProfile, error: profileError } = await supabaseClient
-    .from('profiles')
-    .select('id, name, username, avatar')
-    .eq('id', friendId)
-    .single();
-  
-  if (profileError || !friendProfile) {
-    showToast("오류", "상대방 정보를 찾을 수 없습니다.", "#ff4757");
-    return;
-  }
-  
-  // 5. 새 채팅방 생성
   const { data: newRoom, error } = await supabaseClient
     .from('chat_rooms')
-    .insert({ name: friendProfile.name, is_group: false, created_by: currentUserId })
+    .insert({ name: friend.name, is_group: false, created_by: currentUserId })
     .select()
     .single();
   
@@ -1027,9 +1046,31 @@ function makeMetaEl() {
    메시지 전송
    ============================================================ */
 async function sendPushNotification(text) {
-  // 알림 기능 임시 비활성화 (채팅부터 살리자)
-  console.log('알림 전송 스킵:', text);
-  return;
+  try {
+    const otherIds = currentRoom.members?.filter(id => id !== currentUserId) || [];
+    if (otherIds.length === 0) return;
+
+    const { data: profiles } = await supabaseClient
+      .from('profiles')
+      .select('onesignal_player_id')
+      .in('id', otherIds);
+
+    const playerIds = profiles?.map(p => p.onesignal_player_id).filter(Boolean) || [];
+    if (playerIds.length === 0) return;
+
+    await fetch('https://yrndqghsdtxoajgxvqrv.supabase.co/functions/v1/send-notification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        player_ids: playerIds,
+        title: currentUserProfile?.name || '톡톡',
+        message: text,
+        url: 'https://talk-talk-phi.vercel.app'
+      })
+    });
+  } catch(e) {
+    console.error('알림 전송 실패:', e);
+  }
 }
 
 async function sendMsg() {
