@@ -85,7 +85,7 @@ function showToast(title, message, color='#333') {
   tc.appendChild(t);
   setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 200); }, 2500);
 }
-function showChatNotification(name, text, avatarUrl) {
+function showChatNotification(name, text, avatarUrl, roomId) {
   const tc = document.getElementById('toast-container');
   if (!tc) return;
   const t = document.createElement('div');
@@ -94,8 +94,8 @@ function showChatNotification(name, text, avatarUrl) {
   t.innerHTML = `<div class="toast-avatar avatar-base" ${avStyle}>${avatarUrl?'':'<i class="ti ti-user"></i>'}</div>
                  <div class="toast-body"><div class="toast-name">${name}</div><div class="toast-msg">${text}</div></div>`;
   t.onclick = () => {
-    const room = chatRoomsList.find(r => r.name === name);
-    if (room) openRoomFromData(room.id);
+    // ✅ roomId로 직접 채팅방 열기 (이름으로 찾지 않음)
+    if (roomId) openRoomFromData(roomId);
     t.remove();
   };
   tc.appendChild(t);
@@ -839,7 +839,7 @@ async function openRoomWithFriend(friendId) {
       if (blockedList.includes(msg.sender_id)) return;
       if (!roomOpen || currentRoom.id !== room.id) {
         const sender = friendsList.find(f => f.id === msg.sender_id);
-        showChatNotification(sender?.name || '누군가', msg.content || '사진', sender?.avatar);
+        showChatNotification(sender?.name || '누군가', msg.content || '사진', sender?.avatar, msg.room_id);
       } else {
         appendMessageToUI(msg);
       }
@@ -1023,33 +1023,6 @@ function makeMetaEl() {
 /* ============================================================
    메시지 전송
    ============================================================ */
-async function sendPushNotification(text) {
-  try {
-    const otherIds = currentRoom.members?.filter(id => id !== currentUserId) || [];
-    if (otherIds.length === 0) return;
-
-    const { data: profiles } = await supabaseClient
-      .from('profiles')
-      .select('onesignal_player_id')
-      .in('id', otherIds);
-
-    const playerIds = profiles?.map(p => p.onesignal_player_id).filter(Boolean) || [];
-    if (playerIds.length === 0) return;
-
-    await fetch('https://yrndqghsdtxoajgxvqrv.supabase.co/functions/v1/send-notification', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        player_ids: playerIds,
-        title: currentUserProfile?.name || '톡톡',
-        message: text,
-        url: 'https://talk-talk-phi.vercel.app'
-      })
-    });
-  } catch(e) {
-    console.error('알림 전송 실패:', e);
-  }
-}
 async function sendPushNotification(text) {
   try {
     // 채팅방 멤버 중 나 제외한 상대방 OneSignal player_id 가져오기
