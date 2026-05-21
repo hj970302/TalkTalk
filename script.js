@@ -51,7 +51,13 @@ function applyFont() {
   document.body.style.fontFamily = f.css;
 }
 function applyTheme() {
-  document.documentElement.setAttribute('data-theme', currentTheme === 'dark' ? 'dark' : '');
+  if (currentTheme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else if (currentTheme === 'pokemon') {
+    document.documentElement.setAttribute('data-theme', 'pokemon');
+  } else {
+    document.documentElement.removeAttribute('data-theme'); // white는 기본
+  }
 }
 applyFont();
 applyTheme();
