@@ -123,18 +123,25 @@
   </div>
 
   <!-- 단체채팅방 생성 모달 -->
-  <div class="modal-overlay" id="group-create-modal">
-    <div class="modal-content">
-      <h3>단체채팅방 만들기</h3>
-      <input type="text" id="group-name-input" placeholder="단체채팅방 이름 입력">
-      <div style="margin-bottom:10px; font-size:13px; color:#888;">초대할 친구 선택</div>
-      <div class="manage-list" id="group-member-list" style="max-height:160px;"></div>
-      <div class="modal-btns">
-        <button class="btn-cancel" onclick="closeGroupCreateModal()">취소</button>
-        <button class="btn-confirm" onclick="confirmCreateGroupChat()">만들기</button>
-      </div>
+<div class="modal-overlay" id="group-create-modal">
+  <div class="modal-content">
+    <h3>단체채팅방 만들기</h3>
+    <input type="text" id="group-name-input" placeholder="단체채팅방 이름 입력">
+    
+    <!-- ✅ 비밀 채팅방 체크박스 추가 -->
+    <div style="margin: 12px 0; display: flex; align-items: center; gap: 10px;">
+      <input type="checkbox" id="secret-room-checkbox" style="width: 18px; height: 18px;">
+      <label for="secret-room-checkbox" style="font-size: 14px; color: var(--text);">🔒 비밀 채팅방 (한 명이라도 나가면 모든 내용이 삭제됩니다)</label>
+    </div>
+    
+    <div style="margin-bottom:10px; font-size:13px; color:#888;">초대할 친구 선택</div>
+    <div class="manage-list" id="group-member-list" style="max-height:160px;"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeGroupCreateModal()">취소</button>
+      <button class="btn-confirm" onclick="confirmCreateGroupChat()">만들기</button>
     </div>
   </div>
+</div>
 
   <!-- 이미지 선택 모달 (갤러리 또는 기본 이미지) -->
   <div class="modal-overlay" id="image-source-modal">
