@@ -790,25 +790,42 @@ function makeBubbleEl(msg, isMine) {
   bubble.className = `bubble ${isMine ? 'mine' : 'other'}`;
   
   if (msg.type === 'image' && msg.image_url) {
+    // 📷 사진 메시지
     bubble.classList.add('image-bubble');
     bubble.innerHTML = `<img src="${msg.image_url}" alt="이미지" style="max-width:200px; max-height:200px; border-radius:8px;">`;
-    // 이미지도 길게 누르면 메뉴 뜨도록 추가
-    bubble.oncontextmenu = (e) => {
-      e.preventDefault();
-      triggerBubbleMenu(e, msg.id);
+    
+    // 클릭: 이미지 뷰어 열기
+    bubble.onclick = (e) => {
+      e.stopPropagation();
+      openImageViewer(msg.image_url, msg.id);
     };
-    bubble.addEventListener('touchstart', (e) => {
-      let timer;
-      timer = setTimeout(() => {
-        triggerBubbleMenu(e, msg.id);
-      }, 500);
-      bubble.addEventListener('touchend', () => clearTimeout(timer));
-      bubble.addEventListener('touchmove', () => clearTimeout(timer));
-    });
   } else {
-    bubble.textContent = msg.content || '사진';
-    bubble.onclick = (e) => { e.stopPropagation(); triggerBubbleMenu(e, msg.id); };
+    // 📝 텍스트 메시지
+    bubble.textContent = msg.content || '';
+    // 클릭 시 아무 동작 안 함 (길게 누르기만 반응)
+    bubble.onclick = (e) => e.stopPropagation();
   }
+  
+  // 📌 길게 누르기 (500ms) 공통 처리
+  let pressTimer;
+  bubble.addEventListener('touchstart', (e) => {
+    pressTimer = setTimeout(() => {
+      triggerBubbleMenu(e, msg.id);
+    }, 500);
+  });
+  bubble.addEventListener('touchend', () => {
+    clearTimeout(pressTimer);
+  });
+  bubble.addEventListener('touchmove', () => {
+    clearTimeout(pressTimer);
+  });
+  
+  // 마우스 오른쪽 클릭 (PC 환경)
+  bubble.oncontextmenu = (e) => {
+    e.preventDefault();
+    triggerBubbleMenu(e, msg.id);
+  };
+  
   return bubble;
 }
 
@@ -953,8 +970,16 @@ function triggerBubbleMenu(e, messageId) {
   selectedMessageId = messageId;
   const menu = document.getElementById('bubble-context-menu');
   if (menu) {
-    let x = e.pageX || e.touches?.[0]?.pageX || 0;
-    let y = e.pageY || e.touches?.[0]?.pageY || 0;
+    let x, y;
+    if (e.touches) {
+      // 터치 이벤트
+      x = e.touches[0].clientX;
+      y = e.touches[0].clientY;
+    } else {
+      // 마우스 이벤트
+      x = e.clientX;
+      y = e.clientY;
+    }
     menu.style.top = `${y}px`;
     menu.style.left = `${Math.min(x, window.innerWidth - 130)}px`;
     menu.classList.add('active');
@@ -965,7 +990,7 @@ async function handleBubbleDelete(type) {
   document.getElementById('bubble-context-menu')?.classList.remove('active');
   
   if (type === 'all') {
-    // 모두에게 삭제
+    // 모두에게 삭제 (deleted_for_all = true)
     const { error } = await supabaseClient
       .from('messages')
       .update({ deleted_for_all: true })
