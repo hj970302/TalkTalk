@@ -399,3 +399,158 @@ html, body {
 
 /* 스와이프 관련 옛날 잔재 제거용 */
 .swipe-action-menu { display: none !important; }
+
+/* ============================================================
+   포켓몬 테마 (개인용)
+   ============================================================ */
+[data-theme="pokemon"] {
+  --bg: #ffe6f0;
+  --bg2: #ffd4e4;
+  --bg3: #ffc0d6;
+  --border: #ffb0c4;
+  --text: #d63e6e;
+  --text2: #e86e96;
+  --text3: #f0a0b8;
+  --card: #fff0f5;
+  --input-bg: #fff5f8;
+  --bubble-mine: #ff6b9d;
+  --bubble-mine-text: #fff;
+  --bubble-other: #ffffff;
+  --room-top: #d63e6e;
+  --chat-bg: #fff0f5;
+  --more-hero: #ffe0ec;
+  --section-title: #e86e96;
+  --swipe-bg: #ffe6f0;
+  --chat-item-bg: #ffe6f0;
+}
+
+/* 포켓몬 헤더 배경 이미지 */
+[data-theme="pokemon"] .top-bar {
+  background: linear-gradient(135deg, #ff6b9d, #ff8cae);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 피카츄 이미지 (헤더 오른쪽에 작게) */
+[data-theme="pokemon"] .top-bar::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  bottom: 5px;
+  width: 40px;
+  height: 40px;
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* 몬스터볼 배경 패턴 */
+[data-theme="pokemon"] .screen.active {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png');
+  background-repeat: repeat;
+  background-size: 30px;
+  background-position: 5px 5px;
+  opacity: 0.08;
+}
+
+/* 채팅방 배경 (물 포켓몬 느낌) */
+[data-theme="pokemon"] #screen-room {
+  background: linear-gradient(180deg, #6eb5d6 0%, #8ec4e0 100%);
+  position: relative;
+}
+
+/* 물방울 효과 (잠만보 물방울) */
+[data-theme="pokemon"] #screen-room::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/134.png');
+  background-repeat: no-repeat;
+  background-position: bottom right;
+  background-size: 120px;
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+/* 내 말풍선에 피카츄 얼굴 */
+[data-theme="pokemon"] .bubble.mine {
+  position: relative;
+  background: #ffde6e;
+  color: #2c3e6d;
+}
+
+/* 상대방 말풍선에 몬스터볼 */
+[data-theme="pokemon"] .bubble.other {
+  position: relative;
+  background: #ffffff;
+}
+
+/* 채팅방 상단에 몬스터볼 아이콘 */
+[data-theme="pokemon"] .room-title::before {
+  content: "⚡";
+  margin-right: 6px;
+  font-size: 16px;
+}
+
+[data-theme="pokemon"] .room-title::after {
+  content: "⚡";
+  margin-left: 6px;
+  font-size: 16px;
+}
+
+/* 더보기 탭에 이상해씨 장식 */
+[data-theme="pokemon"] .more-hero {
+  background: linear-gradient(135deg, #7ece7e, #9ee89e);
+  position: relative;
+}
+
+[data-theme="pokemon"] .more-hero::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  bottom: 5px;
+  width: 50px;
+  height: 50px;
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.3;
+}
+
+[data-theme="pokemon"] .more-hero::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  top: 5px;
+  width: 45px;
+  height: 45px;
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.3;
+}
+
+/* 탭바에 몬스터볼 아이콘 */
+[data-theme="pokemon"] .tab-btn.active i {
+  text-shadow: 0 0 5px #ffde6e;
+}
+
+/* 로딩 스피너 (몬스터볼 회전) */
+[data-theme="pokemon"] .loading-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 20px auto;
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png');
+  background-size: contain;
+  animation: pokemon-spin 1s infinite linear;
+}
+
+@keyframes pokemon-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
