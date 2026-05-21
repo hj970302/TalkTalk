@@ -734,18 +734,53 @@ async function sendMsg() {
 async function handleClipFile(inputElement) {
   const file = inputElement.files[0];
   if (!file) return;
-  if (!file.type.startsWith('image/')) { showToast("오류","이미지 파일만 첨부 가능합니다.","#ff4757"); return; }
-  const reader = new FileReader();
-  reader.onload = async function(e) {
-    const base64Img = e.target.result;
-    const { data, error } = await supabaseClient.from('messages').insert({
-      room_id: currentRoom.id, sender_id: currentUserId, image_url: base64Img, type: 'image'
-    }).select().single();
-    if (error) { showToast("오류","이미지를 보낼 수 없습니다.","#ff4757"); }
-    else { appendMessageToUI(data); renderChats(); }
-  };
-  reader.readAsDataURL(file);
+  if (!file.type.startsWith('image/')) {
+    showToast("오류", "이미지 파일만 첨부 가능합니다.", "#ff4757");
+    return;
+  }
+  
+  // 파일명 생성 (유니크하게)
+  const ext = file.name.split('.').pop();
+  const fileName = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 8)}.${ext}`;
+  
+  // 1. Storage에 업로드
+  const { error: uploadError } = await supabaseClient.storage
+    .from('chat-images')
+    .upload(fileName, file);
+  
+  if (uploadError) {
+    console.error('업로드 실패:', uploadError);
+    showToast("오류", "이미지 업로드에 실패했습니다.", "#ff4757");
+    inputElement.value = "";
+    return;
+  }
+  
+  // 2. public URL 얻기
+  const { data: urlData } = supabaseClient.storage
+    .from('chat-images')
+    .getPublicUrl(fileName);
+  
+  // 3. DB에 URL만 저장
+  const { data, error: dbError } = await supabaseClient.from('messages').insert({
+    room_id: currentRoom.id,
+    sender_id: currentUserId,
+    image_url: urlData.publicUrl,
+    type: 'image',
+    content: '📷 사진'
+  }).select().single();
+  
+  if (dbError) {
+    showToast("오류", "메시지 저장에 실패했습니다.", "#ff4757");
+  } else {
+    appendMessageToUI(data);
+    renderChats();
+  }
+  
   inputElement.value = "";
+}
+
+function triggerClip() { 
+  document.getElementById('clip-file-input')?.click(); 
 }
 
 function triggerClip() { document.getElementById('clip-file-input')?.click(); }
