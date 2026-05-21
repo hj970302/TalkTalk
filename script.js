@@ -1688,20 +1688,6 @@ function startGlobalRealtime() {
       await renderChats();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async (payload) => {
-      // ... 기존 프로필 업데이트 코드 ...
-    })
-    .subscribe();
-}
-      if (roomOpen && currentRoom.id === msg.room_id) return;
-      
-      const room = chatRoomsList.find(r => r.id === msg.room_id);
-      if (room?.is_muted) return;
-      
-      const sender = friendsList.find(f => f.id === msg.sender_id);
-      showChatNotification(sender?.name || room?.name || '누군가', msg.content || '사진', sender?.avatar, msg.room_id);
-      await renderChats();
-    })
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async (payload) => {
       const updatedProfile = payload.new;
       
       const friendIndex = friendsList.findIndex(f => f.id === updatedProfile.id);
@@ -1748,8 +1734,7 @@ function startGlobalRealtime() {
       }
     })
     .subscribe();
-}
-/* ============================================================
+}/* ============================================================
    폰트 설정
    ============================================================ */
 function openFontModal() {
