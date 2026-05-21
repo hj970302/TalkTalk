@@ -1751,7 +1751,63 @@ function startGlobalRealtime() {
       if (!roomOpen) renderChats();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async (payload) => {
-      // ... 기존 프로필 업데이트 코드 ...
+      const updatedProfile = payload.new;
+      
+      const friendIndex = friendsList.findIndex(f => f.id === updatedProfile.id);
+      if (friendIndex !== -1) {
+        const old = friendsList[friendIndex];
+        const changed = old.name !== updatedProfile.name || old.status !== updatedProfile.status || old.avatar !== updatedProfile.avatar;
+
+        friendsList[friendIndex] = {
+          ...friendsList[friendIndex],
+          name: updatedProfile.name,
+          status: updatedProfile.status,
+          avatar: updatedProfile.avatar
+        };
+        
+        renderFriends();
+        
+        if (document.getElementById('manage-modal')?.classList.contains('active')) {
+          renderManageList();
+        }
+        
+        if (profileTargetId === updatedProfile.id) {
+          document.getElementById('pc-name').textContent = updatedProfile.name;
+          document.getElementById('pc-status').textContent = updatedProfile.status || '';
+          applyAvatarStyle(document.getElementById('pc-avatar'), updatedProfile.avatar);
+        }
+        
+        if (roomOpen && currentRoom.id && !currentRoom.is_group) {
+          const otherId = currentRoom.members?.find(id => id !== currentUserId);
+          if (otherId === updatedProfile.id) {
+            document.getElementById('room-title').textContent = updatedProfile.name;
+            currentRoom.name = updatedProfile.name;
+          }
+        }
+        
+        const targetRoom = chatRoomsList.find(room => 
+          !room.is_group && room.members?.includes(updatedProfile.id) && room.members?.includes(currentUserId)
+        );
+        if (targetRoom) {
+          targetRoom.name = updatedProfile.name;
+          renderChats();
+        }
+
+        if (changed) showToast("프로필 변경", `${updatedProfile.name}님의 프로필이 업데이트되었습니다.`, "#5352ed");
+      }
+    })
+    // ✅ 채팅방 삭제 감지 (비밀 채팅방용)
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_rooms' }, (payload) => {
+      const deletedRoomId = payload.old.id;
+      console.log('채팅방 삭제 감지:', deletedRoomId);
+      
+      chatRoomsList = chatRoomsList.filter(r => r.id !== deletedRoomId);
+      renderChats();
+      
+      if (roomOpen && currentRoom.id === deletedRoomId) {
+        closeRoom();
+        showToast("알림", "비밀 채팅방이 삭제되었습니다.", "#ff4757");
+      }
     })
     .subscribe();
 }
