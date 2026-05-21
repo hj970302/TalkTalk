@@ -152,7 +152,7 @@ async function loadUserData(userId) {
   const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
   if (profile) { currentUserProfile = profile; syncMyProfileDOM(); }
   
-  await Promise.all([loadBlockedList(), loadFriends(), loadChatRooms()]); 
+ await Promise.all([loadBlockedList(), loadFriends(), loadChatRooms(), loadFriendRequests()]);
   
   renderFriends();
   renderChats();
@@ -307,6 +307,7 @@ async function handleLogout() {
    친구 렌더링
    ============================================================ */
 function renderFriends() {
+  renderFriendRequests(); 
   const container = document.getElementById('friends-list-container');
   if (!container) return;
   const filtered = friendsList.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -1318,17 +1319,39 @@ async function addNewFriendWithVerify() {
   const username = input?.value.trim();
   if (!username) return;
   if (username === currentUserProfile?.username) { alert("자기 자신은 추가할 수 없습니다."); return; }
-  const { data: profile } = await supabaseClient.from('profiles').select('id, username, name, status, avatar').eq('username', username).single();
+  
+  const { data: profile } = await supabaseClient
+    .from('profiles')
+    .select('id, username, name, status, avatar')
+    .eq('username', username)
+    .single();
+  
   if (!profile) { alert("존재하지 않는 아이디입니다."); return; }
   if (friendsList.some(f => f.id === profile.id)) { alert("이미 친구입니다."); return; }
-  await supabaseClient.from('friendships').insert({ user_id: currentUserId, friend_id: profile.id, status: 'accepted' });
-  const { data: room } = await supabaseClient.from('chat_rooms').insert({ name: profile.name, is_group: false, created_by: currentUserId }).select().single();
-  await supabaseClient.from('chat_room_members').insert([{ room_id: room.id, user_id: currentUserId },{ room_id: room.id, user_id: profile.id }]);
-  friendsList.push({ id: profile.id, username: profile.username||'', name: profile.name, status: profile.status||'', avatar: profile.avatar||null, isFavorite: false });
-  chatRoomsList.push(room);
-  renderFriends(); renderChats(); renderManageList();
-  if (input) input.value = '';
-  showToast("친구 추가", `${profile.name}님과 친구가 되었습니다!`, "#2ed573");
+  
+  // 이미 요청 보냈는지 확인
+  const { data: existing } = await supabaseClient
+    .from('friend_requests')
+    .select('id, status')
+    .eq('from_user_id', currentUserId)
+    .eq('to_user_id', profile.id)
+    .maybeSingle();
+  
+  if (existing) {
+    if (existing.status === 'pending') alert("이미 친구 요청을 보냈습니다.");
+    else if (existing.status === 'accepted') alert("이미 친구입니다.");
+    return;
+  }
+  
+  // 친구 요청 보내기
+  await supabaseClient.from('friend_requests').insert({
+    from_user_id: currentUserId,
+    to_user_id: profile.id,
+    status: 'pending'
+  });
+  
+  showToast("친구 요청", `${profile.name}님에게 친구 요청을 보냈습니다.`, "#2ed573");
+  input.value = '';
 }
 
 async function removeFriend(friendId) {
@@ -1900,4 +1923,84 @@ async function resetProfileBg() {
   currentUserProfile.bg = null;
   openProfileCard('me');
   showToast("프로필", "기본 배경으로 변경되었습니다.", "#2ed573");
+}
+// ============================================================
+// 친구 요청 관련 함수
+// ============================================================
+
+let friendRequests = [];
+
+async function loadFriendRequests() {
+  const { data: requests } = await supabaseClient
+    .from('friend_requests')
+    .select('*, from:from_user_id(id, name, username, avatar)')
+    .eq('to_user_id', currentUserId)
+    .eq('status', 'pending');
+  friendRequests = requests || [];
+}
+
+function renderFriendRequests() {
+  const container = document.getElementById('friend-requests-container');
+  const list = document.getElementById('friend-requests-list');
+  if (!container || !list) return;
+  
+  if (friendRequests.length === 0) {
+    container.style.display = 'none';
+    return;
+  }
+  
+  container.style.display = 'block';
+  list.innerHTML = friendRequests.map(req => `
+    <div class="friend-item">
+      <div class="avatar-sm avatar-base">${req.from?.avatar ? `<div style="width:100%;height:100%;background:url('${req.from.avatar}') center/cover;border-radius:50%;"></div>` : '<i class="ti ti-user"></i>'}</div>
+      <div style="flex:1;">
+        <div class="fi-name">${req.from?.name || '알 수 없음'}</div>
+        <div class="fi-status">@${req.from?.username || ''}</div>
+      </div>
+      <div style="display: flex; gap: 6px;">
+        <button onclick="respondToFriendRequest('${req.id}', 'accept')" style="background:#2ed573; border:none; border-radius:6px; padding:5px 10px; cursor:pointer;">✅ 수락</button>
+        <button onclick="respondToFriendRequest('${req.id}', 'reject')" style="background:#ff4757; border:none; border-radius:6px; padding:5px 10px; color:white; cursor:pointer;">❌ 거절</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function respondToFriendRequest(requestId, action) {
+  const { data: req } = await supabaseClient
+    .from('friend_requests')
+    .select('from_user_id')
+    .eq('id', requestId)
+    .single();
+  
+  if (!req) return;
+  
+  if (action === 'accept') {
+    // 요청 상태 업데이트
+    await supabaseClient.from('friend_requests').update({ status: 'accepted' }).eq('id', requestId);
+    
+    // 친구 관계 추가 (양방향)
+    await supabaseClient.from('friendships').insert([
+      { user_id: currentUserId, friend_id: req.from_user_id, status: 'accepted' },
+      { user_id: req.from_user_id, friend_id: currentUserId, status: 'accepted' }
+    ]);
+    
+    // 채팅방 생성
+    const { data: profile } = await supabaseClient.from('profiles').select('name').eq('id', req.from_user_id).single();
+    const { data: room } = await supabaseClient.from('chat_rooms').insert({ name: profile.name, is_group: false, created_by: currentUserId }).select().single();
+    await supabaseClient.from('chat_room_members').insert([
+      { room_id: room.id, user_id: currentUserId },
+      { room_id: room.id, user_id: req.from_user_id }
+    ]);
+    
+    await loadFriends();
+    renderFriends();
+    renderChats();
+    showToast("친구 수락", "친구가 되었습니다!", "#2ed573");
+  } else {
+    await supabaseClient.from('friend_requests').update({ status: 'rejected' }).eq('id', requestId);
+    showToast("친구 거절", "친구 요청을 거절했습니다.", "#ff4757");
+  }
+  
+  await loadFriendRequests();
+  renderFriendRequests();
 }
