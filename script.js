@@ -715,6 +715,11 @@ async function loadMessages(roomId) {
   for (const msg of messages || []) {
     if (msg.deleted_for_all) continue;
     if (blockedList.includes(msg.sender_id)) continue;
+    
+    // ✅ 내가 나가서 삭제한 메시지는 안 보이게 필터링
+    const deletedForMe = msg.deleted_for_me || [];
+    if (deletedForMe.includes(currentUserId)) continue;
+    
     appendMessageToUI(msg);
   }
   
