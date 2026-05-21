@@ -401,7 +401,7 @@ html, body {
 .swipe-action-menu { display: none !important; }
 
 /* ============================================================
-   포켓몬 테마 (개인용) - 깔끔 버전
+   포켓몬 테마 (개인용) - 진짜 포켓몬 이미지 버전
    ============================================================ */
 [data-theme="pokemon"] {
   --bg: #fff9e8;
@@ -429,16 +429,120 @@ html, body {
   background: #ffde6e !important;
 }
 
-/* 헤더 아이콘 (기존 아이콘 그대로, 색상만 변경) */
+/* 헤더 아이콘 색상 */
 [data-theme="pokemon"] .top-icons i,
 [data-theme="pokemon"] .back-btn,
 [data-theme="pokemon"] .room-icons i {
   color: #5a3e1b !important;
 }
 
-/* 채팅방 배경 */
+/* ============================================================
+   탭바 아이콘을 진짜 포켓몬 이미지로 변경
+   ============================================================ */
+
+/* 친구 탭 (이상해씨) */
+[data-theme="pokemon"] #tab-friends i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  font-size: 0 !important;
+  width: 28px;
+  height: 28px;
+  display: inline-block;
+}
+
+[data-theme="pokemon"] #tab-friends i::before {
+  content: "" !important;
+  display: none;
+}
+
+/* 채팅 탭 (파이리) */
+[data-theme="pokemon"] #tab-chats i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  font-size: 0 !important;
+  width: 28px;
+  height: 28px;
+  display: inline-block;
+}
+
+[data-theme="pokemon"] #tab-chats i::before {
+  content: "" !important;
+  display: none;
+}
+
+/* 더보기 탭 (꼬북이) */
+[data-theme="pokemon"] #tab-more i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  font-size: 0 !important;
+  width: 28px;
+  height: 28px;
+  display: inline-block;
+}
+
+[data-theme="pokemon"] #tab-more i::before {
+  content: "" !important;
+  display: none;
+}
+
+/* 모든 탭 버튼 아이콘 통일 */
+[data-theme="pokemon"] .tab-btn i {
+  font-size: 0 !important;
+  width: 28px;
+  height: 28px;
+  display: inline-block;
+}
+
+/* ============================================================
+   채팅방 배경 (포켓몬 이미지)
+   ============================================================ */
 [data-theme="pokemon"] #screen-room {
   background: linear-gradient(180deg, #a8d8ea 0%, #c8e8f5 100%) !important;
+  position: relative;
+}
+
+/* 채팅방 배경: 피카츄 (오른쪽 하단) */
+[data-theme="pokemon"] #screen-room::before {
+  content: "";
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 100px;
+  height: 100px;
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 채팅방 배경: 이상해씨 (왼쪽 하단) */
+[data-theme="pokemon"] #screen-room::after {
+  content: "";
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  width: 90px;
+  height: 90px;
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.12;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 메시지들이 배경 위에 보이게 */
+[data-theme="pokemon"] #room-messages {
+  position: relative;
+  z-index: 1;
 }
 
 /* 내 말풍선 */
@@ -472,12 +576,7 @@ html, body {
   color: #ff6b9d !important;
 }
 
-/* 탭바 일반 아이콘 */
-[data-theme="pokemon"] .tab-btn i {
-  color: inherit !important;
-}
-
-/* 로딩 스피너 */
+/* 로딩 스피너 (몬스터볼) */
 [data-theme="pokemon"] .loading-spinner {
   width: 40px;
   height: 40px;
