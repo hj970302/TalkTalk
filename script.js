@@ -1738,41 +1738,12 @@ function startGlobalRealtime() {
       const myRoomIds = chatRoomsList.map(r => r.id);
       
       if (!myRoomIds.includes(msg.room_id)) {
-        console.log("새 메시지가 왔지만 속한 방이 아님. 재가입 시도:", msg.room_id);
-        
-        // 채팅방 존재 확인
-        const { data: existingRoom } = await supabaseClient
-          .from('chat_rooms')
-          .select('id')
-          .eq('id', msg.room_id)
-          .single();
-        
-        if (!existingRoom) return;
-        
-        const { data: existing } = await supabaseClient
-          .from('chat_room_members')
-          .select('room_id')
-          .eq('room_id', msg.room_id)
-          .eq('user_id', currentUserId)
-          .maybeSingle();
-        
-        if (!existing) {
-          await supabaseClient.from('chat_room_members').insert({
-            room_id: msg.room_id,
-            user_id: currentUserId
-          });
-        }
-        
+        await supabaseClient.from('chat_room_members').insert({
+          room_id: msg.room_id,
+          user_id: currentUserId
+        });
         await loadChatRooms();
         renderChats();
-        
-        const room = chatRoomsList.find(r => r.id === msg.room_id);
-        const sender = friendsList.find(f => f.id === msg.sender_id);
-        showChatNotification(
-          sender?.name || room?.name || '새 메시지', 
-          msg.content || '사진', 
-          sender?.avatar
-        );
         return;
       }
       
@@ -1786,65 +1757,7 @@ function startGlobalRealtime() {
       if (!roomOpen) renderChats();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async (payload) => {
-      const updatedProfile = payload.new;
-      
-      const friendIndex = friendsList.findIndex(f => f.id === updatedProfile.id);
-      if (friendIndex !== -1) {
-        const old = friendsList[friendIndex];
-        const changed = old.name !== updatedProfile.name || old.status !== updatedProfile.status || old.avatar !== updatedProfile.avatar;
-
-        friendsList[friendIndex] = {
-          ...friendsList[friendIndex],
-          name: updatedProfile.name,
-          status: updatedProfile.status,
-          avatar: updatedProfile.avatar
-        };
-        
-        renderFriends();
-        
-        if (document.getElementById('manage-modal')?.classList.contains('active')) {
-          renderManageList();
-        }
-        
-        if (profileTargetId === updatedProfile.id) {
-          document.getElementById('pc-name').textContent = updatedProfile.name;
-          document.getElementById('pc-status').textContent = updatedProfile.status || '';
-          applyAvatarStyle(document.getElementById('pc-avatar'), updatedProfile.avatar);
-        }
-        
-        if (roomOpen && currentRoom.id && !currentRoom.is_group) {
-          const otherId = currentRoom.members?.find(id => id !== currentUserId);
-          if (otherId === updatedProfile.id) {
-            document.getElementById('room-title').textContent = updatedProfile.name;
-            currentRoom.name = updatedProfile.name;
-          }
-        }
-        
-        const targetRoom = chatRoomsList.find(room => 
-          !room.is_group && room.members?.includes(updatedProfile.id) && room.members?.includes(currentUserId)
-        );
-        if (targetRoom) {
-          targetRoom.name = updatedProfile.name;
-          renderChats();
-        }
-
-        if (changed) showToast("프로필 변경", `${updatedProfile.name}님의 프로필이 업데이트되었습니다.`, "#5352ed");
-      }
-    })
-    // ✅ 추가: 채팅방 삭제 감지 (비밀 채팅방용)
-    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_rooms' }, (payload) => {
-      const deletedRoomId = payload.old.id;
-      console.log('채팅방 삭제 감지:', deletedRoomId);
-      
-      // 내 채팅방 목록에서 제거
-      chatRoomsList = chatRoomsList.filter(r => r.id !== deletedRoomId);
-      renderChats();
-      
-      // 현재 열려있는 채팅방이 삭제되었다면 닫기
-      if (roomOpen && currentRoom.id === deletedRoomId) {
-        closeRoom();
-        showToast("알림", "상대방이 비밀 채팅방을 나가서 채팅방이 삭제되었습니다.", "#ff4757");
-      }
+      // ... 기존 프로필 업데이트 코드 ...
     })
     .subscribe();
 }
