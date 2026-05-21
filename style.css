@@ -447,7 +447,6 @@ html, body {
 }
 
 /* 몬스터볼 배경 패턴 */
-[data-theme="pokemon"] .screen.active {
   background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png');
   background-repeat: repeat;
   background-size: 30px;
@@ -626,25 +625,3 @@ html, body {
   100% { box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #333; }
 }
 
-/* 호버 시 살짝 회전 */
-.theme-pokemon-card:hover .monster-ball-circle {
-  transform: rotate(15deg);
-  animation: shake 0.3s ease-in-out;
-}
-
-@keyframes shake {
-  0%, 100% { transform: rotate(0deg); }
-  50% { transform: rotate(20deg); }
-}
-
-/* 선택된 테마일 때 몬스터볼 강조 */
-.theme-card.selected .monster-ball-circle {
-  box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #333, inset 0 -12px 0 0 #ff4757;
-  animation: glow 0.5s ease;
-}
-
-@keyframes glow {
-  0% { box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #333; }
-  50% { box-shadow: 0 0 0 6px #ffde6e, 0 0 0 8px #333; }
-  100% { box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #333; }
-}
