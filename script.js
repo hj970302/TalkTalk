@@ -142,7 +142,7 @@ async function initApp() {
   // 로그인 안 된 경우에만 스플래시 표시
   if (authScreen) {
     authScreen.style.display = 'flex';
-    splashLogo.style.display = 'flex';
+    if (splashLogo) splashLogo.style.display = 'flex';
   }
   setTimeout(() => {
     if (splashLogo) splashLogo.style.display = 'none';
