@@ -721,7 +721,7 @@ async function chatSwipeAction(action, roomId) {
    채팅방 열기
    ============================================================ */
 async function openRoomWithFriend(friendId) {
-  // 1. 상대방이 속한 1:1 채팅방 조회 (내가 나간 상태여도 찾기 위해)
+  // 1. 상대방이 속한 1:1 채팅방 조회 (친구 여부 상관없이)
   const { data: friendRooms } = await supabaseClient
     .from('chat_room_members')
     .select('room_id, chat_rooms!inner(*)')
@@ -731,7 +731,6 @@ async function openRoomWithFriend(friendId) {
   // 2. 그중에서 내가 속하지 않은 방이 있는지 확인 (내가 나간 방)
   let targetRoom = null;
   for (const fr of friendRooms || []) {
-    // 상대방이 속한 방의 멤버 목록 조회
     const { data: members } = await supabaseClient
       .from('chat_room_members')
       .select('user_id')
@@ -739,9 +738,7 @@ async function openRoomWithFriend(friendId) {
     
     const memberIds = members?.map(m => m.user_id) || [];
     
-    // 내가 이 방에 속해 있는지 확인
     if (!memberIds.includes(currentUserId)) {
-      // 내가 나간 방 발견!
       targetRoom = {
         ...fr.chat_rooms,
         members: memberIds
@@ -752,7 +749,6 @@ async function openRoomWithFriend(friendId) {
   
   // 3. 나간 방이 있으면 그 방으로 재입장
   if (targetRoom) {
-    // 멤버로 다시 추가
     await supabaseClient.from('chat_room_members').insert({
       room_id: targetRoom.id,
       user_id: currentUserId
@@ -767,21 +763,27 @@ async function openRoomWithFriend(friendId) {
     return;
   }
   
-  // 4. 나간 방이 없으면 (처음 대화) 새로 생성
-  const friend = friendsList.find(f => f.id === friendId);
-  if (!friend) { 
-    showToast("오류","친구 정보를 찾을 수 없습니다.","#ff4757"); 
-    return; 
+  // 4. 상대방 정보 가져오기 (프로필에서 직접 조회)
+  const { data: friendProfile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('id, name, username, avatar')
+    .eq('id', friendId)
+    .single();
+  
+  if (profileError || !friendProfile) {
+    showToast("오류", "상대방 정보를 찾을 수 없습니다.", "#ff4757");
+    return;
   }
   
+  // 5. 새 채팅방 생성 (친구 여부 상관없이)
   const { data: newRoom, error } = await supabaseClient
     .from('chat_rooms')
-    .insert({ name: friend.name, is_group: false, created_by: currentUserId })
+    .insert({ name: friendProfile.name, is_group: false, created_by: currentUserId })
     .select()
     .single();
   
   if (error) { 
-    showToast("오류","채팅방을 만들 수 없습니다.","#ff4757"); 
+    showToast("오류", "채팅방을 만들 수 없습니다.", "#ff4757"); 
     return; 
   }
   
@@ -793,8 +795,7 @@ async function openRoomWithFriend(friendId) {
   newRoom.members = [currentUserId, friendId];
   chatRoomsList.push(newRoom);
   openRoomFromData(newRoom.id);
-}
-async function openRoomFromData(roomId) {
+}async function openRoomFromData(roomId) {
   let room = chatRoomsList.find(r => r.id === roomId);
   if (!room) {
     const { data: roomData } = await supabaseClient.from('chat_rooms').select('*').eq('id', roomId).single();
