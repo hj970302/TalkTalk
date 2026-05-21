@@ -766,11 +766,18 @@ async function sendMsg() {
   const text = input?.value.trim();
   if (!text || !currentRoom.id) return;
   if (input) input.value = '';
+  
   const { data, error } = await supabaseClient.from('messages').insert({
     room_id: currentRoom.id, sender_id: currentUserId, content: text, type: 'text'
   }).select().single();
-  if (error) { alert("오류: " + error.message); }
-  else { appendMessageToUI(data); renderChats(); }
+  
+  if (error) { 
+    alert("오류: " + error.message); 
+  } else { 
+    appendMessageToUI(data); 
+    // renderChats() 호출 제거 또는 조건부 호출
+    if (!roomOpen) renderChats();  // 채팅방 닫혀있을 때만 갱신
+  }
 }
 
 async function handleClipFile(inputElement) {
@@ -1216,11 +1223,15 @@ function selectEmot(emot) {
   document.getElementById('emoticon-drawer')?.classList.remove('active');
 }
 function switchTab(tab) {
+  // 채팅방이 열려있으면 탭 전환 불가
+  if (roomOpen) return;  // ← 추가
+
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   const map = { friends: 'screen-friends', chats: 'screen-chats', more: 'screen-more' };
   document.getElementById(map[tab])?.classList.add('active');
   document.getElementById('tab-' + tab)?.classList.add('active');
+  document.getElementById('tab-bar').style.display = 'flex';  // ← 추가
   currentTab = tab;
 }
 function closeRoom() {
