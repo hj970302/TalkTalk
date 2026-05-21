@@ -130,24 +130,28 @@ async function initApp() {
       if (!error && session?.user) {
         currentUserId = session.user.id;
         await loadUserData(session.user.id);
+        // 인증 화면 완전히 숨기기
         if (authScreen) {
-          authScreen.style.display = 'none';  // 인증 화면 완전 숨김
+          authScreen.style.display = 'none';
         }
         showToast("환영합니다", `${currentUserProfile?.name || '사용자'}님, 자동 로그인되었습니다.`, "#fee500");
         return;
       }
-    } catch(e) {}
+    } catch(e) {
+      console.log("세션 복원 실패:", e);
+    }
   }
   
-  // 로그인 안 된 경우에만 스플래시 표시
+  // 로그인 안 된 경우에만 인증 화면 표시
   if (authScreen) {
     authScreen.style.display = 'flex';
-    splashLogo.style.display = 'flex';
+    if (splashLogo) splashLogo.style.display = 'flex';
+    
+    setTimeout(() => {
+      if (splashLogo) splashLogo.style.display = 'none';
+      toggleAuthForm('login');
+    }, 1500);
   }
-  setTimeout(() => {
-    if (splashLogo) splashLogo.style.display = 'none';
-    toggleAuthForm('login');
-  }, 1500);
 }
 
 async function loadUserData(userId) {
