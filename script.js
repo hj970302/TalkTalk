@@ -999,7 +999,35 @@ async function sendPushNotification(text) {
     console.error('알림 전송 실패:', e);
   }
 }
+async function sendPushNotification(text) {
+  try {
+    // 채팅방 멤버 중 나 제외한 상대방 OneSignal player_id 가져오기
+    const otherIds = currentRoom.members?.filter(id => id !== currentUserId) || [];
+    if (otherIds.length === 0) return;
 
+    // profiles에서 onesignal_player_id 가져오기
+    const { data: profiles } = await supabaseClient
+      .from('profiles')
+      .select('onesignal_player_id')
+      .in('id', otherIds);
+
+    const playerIds = profiles?.map(p => p.onesignal_player_id).filter(Boolean) || [];
+    if (playerIds.length === 0) return;
+
+    await fetch('https://yrndqghsdtxoajgxvqrv.supabase.co/functions/v1/send-notification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        player_ids: playerIds,
+        title: currentUserProfile?.name || '톡톡',
+        message: text,
+        url: 'https://talk-talk-phi.vercel.app'
+      })
+    });
+  } catch(e) {
+    console.error('알림 전송 실패:', e);
+  }
+}
 
 async function sendMsg() {
   const input = document.getElementById('msg-input');
@@ -1640,20 +1668,6 @@ function startGlobalRealtime() {
       const sender = friendsList.find(f => f.id === msg.sender_id);
       showChatNotification(sender?.name || room?.name || '누군가', msg.content || '사진', sender?.avatar);
       if (!roomOpen) renderChats();
-    })
-    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'chat_rooms' }, async (payload) => {
-      const deletedRoomId = payload.old?.id;
-      if (!deletedRoomId) return;
-      const wasInRoom = chatRoomsList.find(r => r.id === deletedRoomId);
-      if (!wasInRoom) return;
-      chatRoomsList = chatRoomsList.filter(r => r.id !== deletedRoomId);
-      if (roomOpen && currentRoom.id === deletedRoomId) {
-        closeRoom();
-        showToast('비밀채팅방', '상대방이 나가서 채팅방이 삭제되었습니다.', '#ff4757');
-      } else {
-        renderChats();
-        showToast('비밀채팅방', '비밀채팅방이 삭제되었습니다.', '#ff4757');
-      }
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async (payload) => {
       // ... 기존 프로필 업데이트 코드 그대로 ...
