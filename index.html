@@ -183,26 +183,32 @@
   </div>
 
   <!-- 테마 설정 모달 -->
-  <div class="modal-overlay" id="theme-modal">
-    <div class="modal-content">
-      <h3>테마 변경</h3>
-      <div class="theme-list">
-        <div class="theme-card" id="theme-white" onclick="setTheme('white')">
-          <div class="tc-circle" style="background:#ffffff; border-color:#ddd;"></div>
-          <div class="tc-name">화이트</div>
-          <i class="ti ti-check tc-check"></i>
-        </div>
-        <div class="theme-card" id="theme-dark" onclick="setTheme('dark')">
-          <div class="tc-circle" style="background:#1a1a1a; border-color:#555;"></div>
-          <div class="tc-name">블랙</div>
-          <i class="ti ti-check tc-check"></i>
-        </div>
+<div class="modal-overlay" id="theme-modal">
+  <div class="modal-content">
+    <h3>테마 변경</h3>
+    <div class="theme-list">
+      <div class="theme-card" id="theme-white" onclick="setTheme('white')">
+        <div class="tc-circle" style="background:#ffffff; border-color:#ddd;"></div>
+        <div class="tc-name">화이트</div>
+        <i class="ti ti-check tc-check"></i>
       </div>
-      <div class="modal-btns">
-        <button class="btn-cancel" onclick="closeThemeModal()">닫기</button>
+      <div class="theme-card" id="theme-dark" onclick="setTheme('dark')">
+        <div class="tc-circle" style="background:#1a1a1a; border-color:#555;"></div>
+        <div class="tc-name">블랙</div>
+        <i class="ti ti-check tc-check"></i>
+      </div>
+      <!-- 👇 포켓몬 테마 (몬스터볼 스타일) -->
+      <div class="theme-card theme-pokemon-card" id="theme-pokemon" onclick="setTheme('pokemon')">
+        <div class="tc-circle monster-ball-circle"></div>
+        <div class="tc-name">포켓몬</div>
+        <i class="ti ti-check tc-check"></i>
       </div>
     </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeThemeModal()">닫기</button>
+    </div>
   </div>
+</div>
 
   <!-- 채팅 검색 바 -->
   <div class="chat-search-bar" id="chat-search-bar">
