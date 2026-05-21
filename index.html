@@ -127,6 +127,17 @@
     </div>
   </div>
 
+  <!-- 이미지 선택 모달 (갤러리 또는 기본 이미지) -->
+  <div class="modal-overlay" id="image-source-modal">
+    <div class="modal-content">
+      <h3>프로필 사진 설정</h3>
+      <div class="modal-btns" style="flex-direction: column; gap: 10px;">
+        <button class="btn-confirm" onclick="selectImageSource('gallery')" style="width:100%;">📷 갤러리에서 선택</button>
+        <button class="btn-cancel" onclick="selectImageSource('default')" style="width:100%;">🔄 기본 이미지로 변경</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 단톡방 초대 모달 -->
   <div class="modal-overlay" id="invite-modal">
     <div class="modal-content">
