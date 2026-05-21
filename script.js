@@ -699,7 +699,6 @@ async function openRoomWithFriend(friendId) {
             .select('user_id')
             .eq('room_id', roomData.id);
           roomData.members = members?.map(m => m.user_id) || [];
-          chatRoomsList.push(roomData);
           room = roomData;
         }
       }
@@ -732,7 +731,6 @@ async function openRoomWithFriend(friendId) {
     
     newRoom.members = [currentUserId, friendId];
     chatRoomsList.push(newRoom);
-    room = newRoom;
   }
   
   openRoomFromData(room.id);
