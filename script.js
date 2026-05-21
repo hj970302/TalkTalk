@@ -1650,6 +1650,7 @@ function closeRoom() {
   document.getElementById('tab-bar').style.display = 'flex';
   document.getElementById('emoticon-drawer')?.classList.remove('active');
   document.getElementById('room-search-bar')?.classList.remove('active');
+  startGlobalRealtime();
   renderChats();
   switchTab(currentTab);
 }
@@ -1688,7 +1689,6 @@ function startGlobalRealtime() {
         });
         await loadChatRooms();
         renderChats();
-        return;
       }
       
       if (roomOpen && currentRoom.id === msg.room_id) return;
@@ -1697,7 +1697,7 @@ function startGlobalRealtime() {
       if (room?.is_muted) return;
       
       const sender = friendsList.find(f => f.id === msg.sender_id);
-      showChatNotification(sender?.name || room?.name || '누군가', msg.content || '사진', sender?.avatar);
+      showChatNotification(sender?.name || room?.name || '누군가', msg.content || '사진', sender?.avatar, msg.room_id);
       renderChats();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async (payload) => {
