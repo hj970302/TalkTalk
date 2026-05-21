@@ -339,7 +339,7 @@ function renderRecommendSection() {
   html += recommends.map(p => `
     <div class="friend-item" style="opacity:0.75;">
       <div class="avatar-sm avatar-base">${p.avatar ? `<div style="width:100%;height:100%;background:url('${p.avatar}') center/cover;border-radius:50%;"></div>` : '<i class="ti ti-user"></i>'}</div>
-      <div style="flex:1;"><div class="fi-name">${p.name}</div><div class="fi-status">${p.status||'안녕하세요!'}</div></div>
+      <div style="flex:1;"><div class="fi-name">${p.name}</div><div class="fi-status">${p.status||''}</div></div>
       <button onclick="quickAddFriend('${p.id}','${p.username}','${p.name}')" style="background:#fee500;border:none;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;">추가</button>
     </div>
   `).join('');
@@ -376,7 +376,7 @@ function makeFriendItemHTML(f) {
     <div class="avatar-sm avatar-base" ${avatarStyle}>${avatarIcon}</div>
     <div style="flex:1;min-width:0;">
       <div class="fi-name" style="display:flex;align-items:center;gap:4px;">${f.name}${blockedBadge}</div>
-      <div class="fi-status">${isBlocked ? '차단된 친구' : (f.status||'안녕하세요!')}</div>
+      <div class="fi-status">${isBlocked ? '차단된 친구' : (f.status||'')}</div>
     </div>
     ${starBadge}
   </div>`;
@@ -987,7 +987,7 @@ async function addNewFriendWithVerify() {
   await supabaseClient.from('friendships').insert({ user_id: currentUserId, friend_id: profile.id, status: 'accepted' });
   const { data: room } = await supabaseClient.from('chat_rooms').insert({ name: profile.name, is_group: false, created_by: currentUserId }).select().single();
   await supabaseClient.from('chat_room_members').insert([{ room_id: room.id, user_id: currentUserId },{ room_id: room.id, user_id: profile.id }]);
-  friendsList.push({ id: profile.id, username: profile.username||'', name: profile.name, status: profile.status||'안녕하세요!', avatar: profile.avatar||null, isFavorite: false });
+  friendsList.push({ id: profile.id, username: profile.username||'', name: profile.name, status: profile.status||'', avatar: profile.avatar||null, isFavorite: false });
   chatRoomsList.push(room);
   renderFriends(); renderChats(); renderManageList();
   if (input) input.value = '';
@@ -1044,7 +1044,7 @@ async function openProfileCard(id) {
     // (반대로 내가 차단된 경우는 서버에서 처리)
 
     document.getElementById('pc-name').textContent = user.name;
-    document.getElementById('pc-status').textContent = user.status || '안녕하세요!';
+    document.getElementById('pc-status').textContent = user.status || '';
     nameEditIcon.style.display = 'none';
     statusEditIcon.style.display = 'none';
     starBtn.style.display = 'inline-block';
@@ -1375,7 +1375,7 @@ function startGlobalRealtime() {
         
         if (profileTargetId === updatedProfile.id) {
           document.getElementById('pc-name').textContent = updatedProfile.name;
-          document.getElementById('pc-status').textContent = updatedProfile.status || '안녕하세요!';
+          document.getElementById('pc-status').textContent = updatedProfile.status || '';
           applyAvatarStyle(document.getElementById('pc-avatar'), updatedProfile.avatar);
         }
         
