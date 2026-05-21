@@ -585,7 +585,7 @@ html, body {
   width: 40px;
   height: 40px;
   margin: 20px auto;
-  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png');
+  background-image: url('https://yrndqghsdtxoajgxvqrv.supabase.co/storage/v1/object/public/chat-images/poketmon.jpg');
   background-size: contain;
   animation: pokemon-spin 1s infinite linear;
 }
