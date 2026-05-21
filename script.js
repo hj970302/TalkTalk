@@ -246,7 +246,7 @@ async function handleRegister() {
   if (error || !data.user) { alert("회원가입에 실패했습니다."); return; }
 
   const { error: profileError } = await supabaseClient.from('profiles').insert({
-    id: data.user.id, username, name, status: '환영합니다'
+    id: data.user.id, username, name, status: ''
   });
   if (profileError) { alert("회원가입에 실패했습니다."); return; }
 
