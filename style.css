@@ -520,8 +520,79 @@ html, body {
 }
 
 /* ============================================================
-   채팅방 배경 (포켓몬 이미지)
+   포켓몬 테마 (개인용)
    ============================================================ */
+[data-theme="pokemon"] {
+  --bg: #fff9e8;
+  --bg2: #fef0d8;
+  --bg3: #fde8c8;
+  --border: #f5d8a8;
+  --text: #5a3e1b;
+  --text2: #8b6b3d;
+  --text3: #c4a56e;
+  --card: #ffffff;
+  --input-bg: #fffdf5;
+  --bubble-mine: #ffde6e;
+  --bubble-mine-text: #5a3e1b;
+  --bubble-other: #ffffff;
+  --room-top: #ffde6e;
+  --chat-bg: #a8d8ea;
+  --more-hero: #ffde6e;
+  --section-title: #c4a56e;
+  --swipe-bg: #fff9e8;
+  --chat-item-bg: #fff9e8;
+}
+
+/* 헤더 배경 */
+[data-theme="pokemon"] .top-bar {
+  background: #ffde6e !important;
+}
+
+/* 헤더 아이콘 색상 */
+[data-theme="pokemon"] .top-icons i,
+[data-theme="pokemon"] .back-btn,
+[data-theme="pokemon"] .room-icons i {
+  color: #5a3e1b !important;
+}
+
+/* 탭바 아이콘 (포켓몬 이미지로 변경 - 크기 유지) */
+[data-theme="pokemon"] #tab-friends i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-color: transparent !important;
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+}
+[data-theme="pokemon"] #tab-friends i::before { content: "" !important; display: none; }
+
+[data-theme="pokemon"] #tab-chats i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-color: transparent !important;
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+}
+[data-theme="pokemon"] #tab-chats i::before { content: "" !important; display: none; }
+
+[data-theme="pokemon"] #tab-more i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-color: transparent !important;
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+}
+[data-theme="pokemon"] #tab-more i::before { content: "" !important; display: none; }
+
+/* 채팅방 배경 */
 [data-theme="pokemon"] #screen-room {
   background-image: url('https://yrndqghsdtxoajgxvqrv.supabase.co/storage/v1/object/public/chat-images/pokemon.jpg') !important;
   background-size: cover !important;
@@ -529,22 +600,6 @@ html, body {
   background-repeat: no-repeat !important;
   position: relative;
   overflow: hidden;
-}
-
-[data-theme="pokemon"] #screen-room::before {
-  display: none !important;
-}
-
-[data-theme="pokemon"] #screen-room::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(168, 216, 234, 0.2);
-  pointer-events: none;
-  z-index: 0;
 }
 
 [data-theme="pokemon"] #room-messages {
@@ -576,7 +631,7 @@ html, body {
   background: #ffde6e !important;
 }
 
-/* 탭바 활성화 */
+/* 탭바 활성화 색상 */
 [data-theme="pokemon"] .tab-btn.active {
   color: #ff6b9d !important;
 }
@@ -595,9 +650,7 @@ html, body {
   100% { transform: rotate(360deg); }
 }
 
-/* ============================================================
-   몬스터볼 테마 카드 스타일
-   ============================================================ */
+/* 몬스터볼 테마 카드 스타일 */
 .monster-ball-circle {
   width: 36px;
   height: 36px;
