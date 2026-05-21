@@ -464,37 +464,41 @@ document.addEventListener('mousedown', e => {
 async function renderChats() {
   const container = document.getElementById('chats-list-container');
   if (!container) return;
-
   const sorted = [...chatRoomsList].sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
   const filtered = sorted.filter(c => c.name?.toLowerCase().includes(chatSearchQuery.toLowerCase()));
-
   if (filtered.length === 0) {
     container.innerHTML = `<div class="empty-state"><p>채팅방이 없습니다.</p></div>`;
     return;
   }
 
+  // 모든 채팅방 마지막 메시지 한번에 가져오기
+  const roomIds = filtered.map(r => r.id);
+  const { data: allLastMsgs } = await supabaseClient
+    .from('messages')
+    .select('room_id, content, type, created_at')
+    .in('room_id', roomIds)
+    .order('created_at', { ascending: false });
+
+  // 채팅방별 마지막 메시지 정리
+  const lastMsgMap = {};
+  for (const msg of allLastMsgs || []) {
+    if (!lastMsgMap[msg.room_id]) lastMsgMap[msg.room_id] = msg;
+  }
+
   container.innerHTML = '';
   for (const room of filtered) {
-    // 마지막 메시지 로드
-    const { data: lastMsg } = await supabaseClient
-      .from('messages').select('content, type, created_at')
-      .eq('room_id', room.id).order('created_at', { ascending: false }).limit(1);
+    const lastChat = lastMsgMap[room.id];
+    if (!lastChat) continue;
 
-    const lastChat = lastMsg?.[0];
-    if(!lastChat) continue; //
-    let displayMsg = lastChat
-      ? (lastChat.type === 'image' ? '📸 사진' : (lastChat.content?.substring(0, 30) || ''))
-      : '대화 내역 없음';
+    let displayMsg = lastChat.type === 'image' ? '📸 사진' : (lastChat.content?.substring(0, 30) || '');
     let displayTime = '';
-    if (lastChat?.created_at) {
+    if (lastChat.created_at) {
       const d = new Date(lastChat.created_at);
       const h = d.getHours(); const m = String(d.getMinutes()).padStart(2, '0');
       displayTime = `${h >= 12 ? '오후' : '오전'} ${h % 12 || 12}:${m}`;
     }
 
     const isPinned = room.is_pinned || false;
-
-    // 채팅방 아바타: 1:1은 상대방 프로필사진
     let avatarHtml = '';
     if (!room.is_group) {
       const otherId = room.members?.find(id => id !== currentUserId);
