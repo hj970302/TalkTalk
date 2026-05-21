@@ -681,7 +681,10 @@ async function openRoomFromData(roomId) {
     })
     .subscribe();
 
- async function loadMessages(roomId) {
+  await loadMessages(room.id);
+}
+
+async function loadMessages(roomId) {
   const container = document.getElementById('room-messages');
   if (!container) return;
   
@@ -710,14 +713,8 @@ async function openRoomFromData(roomId) {
   container.innerHTML = `<div class="date-sep"><span>${dateStr()}</span></div>`;
   
   for (const msg of messages || []) {
-    // 삭제 조건 체크
     if (msg.deleted_for_all) continue;
     if (blockedList.includes(msg.sender_id)) continue;
-    
-    // 👇 추가: 내가 나간 채팅방에서 메시지 숨김 처리
-    const deletedForMe = msg.deleted_for_me || [];
-    if (deletedForMe.includes(currentUserId)) continue;
-    
     appendMessageToUI(msg);
   }
   
