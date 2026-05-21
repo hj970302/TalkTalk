@@ -556,16 +556,34 @@ async function chatSwipeAction(action, roomId) {
   const room = chatRoomsList.find(r => r.id === roomId);
   if (!room) return;
   closeAllSwipes(null);
+  
   if (action === 'pin') {
     room.is_pinned = !room.is_pinned;
     chatRoomsList.sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
     showToast("채팅방", room.is_pinned ? "상단에 고정되었습니다." : "고정이 해제되었습니다.", "#5352ed");
     renderChats();
+    
   } else if (action === 'leave') {
-    if (!confirm("채팅방에서 나가시겠습니까?")) return;
+    if (!confirm("채팅방에서 나가시겠습니까? 나가면 대화 내용이 삭제됩니다.")) return;
+    
+    // 1. 내가 보낸 메시지 삭제
+    await supabaseClient.from('messages').delete().eq('room_id', roomId).eq('sender_id', currentUserId);
+    
+    // 2. 채팅방 멤버에서 제거
     await supabaseClient.from('chat_room_members').delete().eq('room_id', roomId).eq('user_id', currentUserId);
+    
+    // 3. 방에 아무도 없으면 방 자체도 삭제 (선택 사항)
+    const { data: remainingMembers, count } = await supabaseClient
+      .from('chat_room_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('room_id', roomId);
+    
+    if (count === 0) {
+      await supabaseClient.from('chat_rooms').delete().eq('id', roomId);
+    }
+    
     chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
-    showToast("채팅방", "채팅방에서 나갔습니다.", "#ff4757");
+    showToast("채팅방", "채팅방에서 나갔습니다. 내 대화 내용이 삭제되었습니다.", "#ff4757");
     renderChats();
   }
 }
