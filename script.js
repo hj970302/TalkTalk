@@ -129,10 +129,8 @@ async function initApp() {
       const { data: { session }, error } = await supabaseClient.auth.getSession();
       if (!error && session?.user) {
         currentUserId = session.user.id;
+        if (authScreen) authScreen.style.display = 'none';
         await loadUserData(session.user.id);
-        if (authScreen) {
-          authScreen.style.display = 'none';  // 인증 화면 완전 숨김
-        }
         showToast("환영합니다", `${currentUserProfile?.name || '사용자'}님, 자동 로그인되었습니다.`, "#fee500");
         return;
       }
