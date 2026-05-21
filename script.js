@@ -195,13 +195,35 @@ async function loadFriends() {
 }
 
 async function loadChatRooms() {
-  const { data: rooms } = await supabaseClient
+  // 1. 내가 속한 방 ID 목록 가져오기
+  const { data: myMemberships } = await supabaseClient
     .from('chat_room_members')
-    .select('room_id, chat_rooms(*), user_id')
+    .select('room_id')
     .eq('user_id', currentUserId);
-  chatRoomsList = rooms?.map(r => ({
-    ...r.chat_rooms,
-    members: rooms.filter(m => m.room_id === r.room_id).map(m => m.user_id)
+  
+  if (!myMemberships || myMemberships.length === 0) {
+    chatRoomsList = [];
+    return;
+  }
+  
+  const myRoomIds = myMemberships.map(m => m.room_id);
+  
+  // 2. 해당 방들의 모든 멤버 조회
+  const { data: allMembers } = await supabaseClient
+    .from('chat_room_members')
+    .select('room_id, user_id')
+    .in('room_id', myRoomIds);
+  
+  // 3. 방 정보 조회
+  const { data: roomsData } = await supabaseClient
+    .from('chat_rooms')
+    .select('*')
+    .in('id', myRoomIds);
+  
+  // 4. 멤버 정보 매핑
+  chatRoomsList = roomsData?.map(room => ({
+    ...room,
+    members: allMembers?.filter(m => m.room_id === room.id).map(m => m.user_id) || []
   })) || [];
 }
 
@@ -717,15 +739,39 @@ async function openRoomWithFriend(friendId) {
 }
 
 async function openRoomFromData(roomId) {
+  // 1. 이미 목록에 있는지 확인
   let room = chatRoomsList.find(r => r.id === roomId);
+  
   if (!room) {
-    const { data: roomData } = await supabaseClient.from('chat_rooms').select('*').eq('id', roomId).single();
-    if (!roomData) { showToast("오류","채팅방을 찾을 수 없습니다.","#ff4757"); return; }
+    // 2. DB에서 방 정보 가져오기
+    const { data: roomData } = await supabaseClient
+      .from('chat_rooms')
+      .select('*')
+      .eq('id', roomId)
+      .single();
+    
+    if (!roomData) { 
+      showToast("오류", "채팅방을 찾을 수 없습니다.", "#ff4757"); 
+      return; 
+    }
+    
     room = roomData;
-    chatRoomsList.push(room);
+    
+    // 3. 멤버 정보 가져오기
+    const { data: memberRows } = await supabaseClient
+      .from('chat_room_members')
+      .select('user_id')
+      .eq('room_id', room.id);
+    
+    room.members = memberRows?.map(r => r.user_id) || [];
+    
+    // ✅ 중복 방지: 이미 목록에 없을 때만 추가
+    if (!chatRoomsList.find(r => r.id === room.id)) {
+      chatRoomsList.push(room);
+    }
   }
   
-  // 멤버 정보 추가
+  // 4. 멤버 정보가 없으면 다시 가져오기 (안전 장치)
   if (!room.members || room.members.length === 0) {
     const { data: memberRows } = await supabaseClient
       .from('chat_room_members')
@@ -737,7 +783,7 @@ async function openRoomFromData(roomId) {
   currentRoom = room;
   roomOpen = true;
 
-  // 👇 여기 수정: 멤버 수 표시
+  // 멤버 수 표시
   const memberCount = room.members?.length || 0;
   const roomTitle = room.name || (room.is_group ? '단체방' : '대화');
   document.getElementById('room-title').innerHTML = `${roomTitle} <span style="font-size:12px; opacity:0.7; font-weight:normal;">(${memberCount})</span>`;
