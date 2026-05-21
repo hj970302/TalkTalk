@@ -548,13 +548,16 @@ async function openRoomFromData(targetId) {
       table: 'messages',
       filter: `room_id=eq.${room.id}`
     }, (payload) => {
-      if (!roomOpen || currentRoom.id !== room.id) {
-        const sender = friendsList.find(f => f.id === payload.new.sender_id);
-        showChatNotification(sender?.name || '누군가', payload.new.content || '사진', sender?.avatar);
-      } else {
-        appendMessageToUI(payload.new);
-      }
-    })
+  // 내가 보낸 메시지는 sendMsg에서 이미 추가했으므로 중복 방지
+  if (payload.new.sender_id === currentUserId) return;
+
+  if (!roomOpen || currentRoom.id !== room.id) {
+    const sender = friendsList.find(f => f.id === payload.new.sender_id);
+    showChatNotification(sender?.name || '누군가', payload.new.content || '사진', sender?.avatar);
+  } else {
+    appendMessageToUI(payload.new);
+  }
+})
     .subscribe();
   
   await loadMessages(room.id);
@@ -650,26 +653,25 @@ async function sendMsg() {
   const text = input?.value.trim();
   if (!text || !currentRoom.id) return;
   if (input) input.value = '';
-  
-  // 단순한 INSERT 시도
-  const result = await supabaseClient
+
+  const { data, error } = await supabaseClient
     .from('messages')
     .insert({
       room_id: currentRoom.id,
       sender_id: currentUserId,
       content: text,
       type: 'text'
-    });
-  
-  console.log("결과:", result);
-  
-  if (result.error) {
-    alert("오류: " + result.error.message);
+    })
+    .select()   // ← 이게 핵심! 삽입된 행을 반환받음
+    .single();
+
+  if (error) {
+    alert("오류: " + error.message);
   } else {
-    console.log("성공!");
+    appendMessageToUI(data);   // ← 직접 UI에 추가
+    renderChats();
   }
 }
-
 function triggerBubbleMenu(e, messageId) {
   selectedMessageId = messageId;
   const menu = document.getElementById('bubble-context-menu');
