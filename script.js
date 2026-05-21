@@ -433,13 +433,85 @@ function makeFriendItemHTML(f) {
 }
 
 /* ==========================================================================
+   스와이프 이벤트
+   ========================================================================== */
+function attachSwipeToItem(wrapper) {
+  let startX = 0, startY = 0, isDragging = false, isHorizontal = null;
+  const SWIPE_THRESHOLD = 40;
+  const SWIPE_WIDTH = 212;
+
+  function onStart(x, y) {
+    startX = x; startY = y;
+    isDragging = true; isHorizontal = null;
+  }
+  function onMove(x, y) {
+    if (!isDragging) return;
+    const dx = x - startX;
+    const dy = y - startY;
+    if (isHorizontal === null) {
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        isHorizontal = Math.abs(dx) > Math.abs(dy);
+      }
+    }
+    if (!isHorizontal) return;
+  }
+  function onEnd(x) {
+    if (!isDragging || !isHorizontal) { isDragging = false; return; }
+    isDragging = false;
+    const dx = x - startX;
+    const isSwiped = wrapper.classList.contains('swiped');
+    if (!isSwiped && dx < -SWIPE_THRESHOLD) {
+      // 다른 열린 것 닫기
+      document.querySelectorAll('.chat-item-wrapper.swiped').forEach(el => {
+        if (el !== wrapper) el.classList.remove('swiped');
+      });
+      wrapper.classList.add('swiped');
+    } else if (isSwiped && dx > SWIPE_THRESHOLD) {
+      wrapper.classList.remove('swiped');
+    }
+  }
+
+  // 터치
+  wrapper.addEventListener('touchstart', e => {
+    onStart(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+  wrapper.addEventListener('touchmove', e => {
+    onMove(e.touches[0].clientX, e.touches[0].clientY);
+    if (isHorizontal) e.preventDefault();
+  }, { passive: false });
+  wrapper.addEventListener('touchend', e => {
+    onEnd(e.changedTouches[0].clientX);
+  });
+
+  // 마우스 (데스크톱 테스트용)
+  wrapper.addEventListener('mousedown', e => {
+    onStart(e.clientX, e.clientY);
+  });
+  window.addEventListener('mousemove', e => {
+    if (isDragging) onMove(e.clientX, e.clientY);
+  });
+  window.addEventListener('mouseup', e => {
+    if (isDragging) onEnd(e.clientX);
+  });
+}
+
+// 스와이프 메뉴 밖 터치하면 닫기
+document.addEventListener('touchstart', e => {
+  if (!e.target.closest('.chat-item-wrapper')) {
+    document.querySelectorAll('.chat-item-wrapper.swiped').forEach(el => el.classList.remove('swiped'));
+  }
+}, { passive: true });
+
+/* ==========================================================================
    채팅 목록 렌더링
    ========================================================================== */
 async function renderChats() {
   const container = document.getElementById('chats-list-container');
   if (!container) return;
 
-  const filtered = chatRoomsList.filter(c =>
+  // 고정된 방 먼저
+  const sorted = [...chatRoomsList].sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
+  const filtered = sorted.filter(c =>
     c.name?.toLowerCase().includes(chatSearchQuery.toLowerCase())
   );
 
@@ -479,20 +551,20 @@ async function renderChats() {
 
     wrapper.innerHTML = `
       <div class="chat-swipe-actions">
-        <button class="swa-btn swa-pin" onclick="chatSwipeAction('pin','${room.id}',this)">
-          <i class="ti ${isPinned ? 'ti-pin-filled' : 'ti-pin'}"></i><span>${isPinned ? '고정해제' : '고정'}</span>
+        <button class="swa-btn swa-pin"  onclick="chatSwipeAction('pin','${room.id}')">
+          <i class="ti ${isPinned ? 'ti-pin-filled' : 'ti-pin'}"></i><span>${isPinned ? '해제' : '고정'}</span>
         </button>
-        <button class="swa-btn swa-mute" onclick="chatSwipeAction('mute','${room.id}',this)">
-          <i class="ti ${isMuted ? 'ti-bell' : 'ti-bell-off'}"></i><span>${isMuted ? '알림켜기' : '알림끄기'}</span>
+        <button class="swa-btn swa-mute" onclick="chatSwipeAction('mute','${room.id}')">
+          <i class="ti ${isMuted ? 'ti-bell' : 'ti-bell-off'}"></i><span>${isMuted ? '켜기' : '끄기'}</span>
         </button>
-        <button class="swa-btn swa-read" onclick="chatSwipeAction('read','${room.id}',this)">
-          <i class="ti ti-checks"></i><span>읽음처리</span>
+        <button class="swa-btn swa-read" onclick="chatSwipeAction('read','${room.id}')">
+          <i class="ti ti-checks"></i><span>읽음</span>
         </button>
-        <button class="swa-btn swa-leave" onclick="chatSwipeAction('leave','${room.id}',this)">
+        <button class="swa-btn swa-leave" onclick="chatSwipeAction('leave','${room.id}')">
           <i class="ti ti-door-exit"></i><span>나가기</span>
         </button>
       </div>
-      <div class="chat-item" onclick="openRoomFromData('${room.id}')">
+      <div class="chat-item${isPinned ? ' pinned' : ''}" onclick="openRoomFromData('${room.id}')">
         <div class="chat-avatar avatar-base">${room.is_group ? '<i class="ti ti-users"></i>' : '<i class="ti ti-user"></i>'}</div>
         <div class="ci-info">
           <div class="ci-row1">
@@ -506,7 +578,9 @@ async function renderChats() {
         </div>
       </div>
     `;
+
     container.appendChild(wrapper);
+    attachSwipeToItem(wrapper);
   }
 }
 
@@ -606,26 +680,30 @@ async function openRoomFromData(roomId) {
   document.getElementById('tab-bar').style.display = 'none';
 
   if (messagesSubscription) {
-    supabaseClient.removeChannel(messagesSubscription);
+    await supabaseClient.removeChannel(messagesSubscription);
+    messagesSubscription = null;
   }
 
   messagesSubscription = supabaseClient
-    .channel(`room-${room.id}`)
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'messages',
-      filter: `room_id=eq.${room.id}`
-    }, (payload) => {
-      if (payload.new.sender_id === currentUserId) return;
-      if (!roomOpen || currentRoom.id !== room.id) {
-        const sender = friendsList.find(f => f.id === payload.new.sender_id);
-        showChatNotification(sender?.name || '누군가', payload.new.content || '사진', sender?.avatar);
-      } else {
-        appendMessageToUI(payload.new);
+    .channel(`messages-room-${room.id}`)
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'messages' },
+      (payload) => {
+        const msg = payload.new;
+        if (msg.room_id !== room.id) return;
+        if (msg.sender_id === currentUserId) return;
+        if (!roomOpen || currentRoom.id !== room.id) {
+          const sender = friendsList.find(f => f.id === msg.sender_id);
+          showChatNotification(sender?.name || '누군가', msg.content || '사진', sender?.avatar);
+        } else {
+          appendMessageToUI(msg);
+        }
       }
-    })
-    .subscribe();
+    )
+    .subscribe((status, err) => {
+      console.log(`[실시간] 구독 상태:`, status, err || '');
+    });
 
   await loadMessages(room.id);
 }
