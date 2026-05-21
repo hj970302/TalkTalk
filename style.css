@@ -404,142 +404,127 @@ html, body {
    포켓몬 테마 (개인용)
    ============================================================ */
 [data-theme="pokemon"] {
-  --bg: #ffe6f0;
-  --bg2: #ffd4e4;
-  --bg3: #ffc0d6;
-  --border: #ffb0c4;
-  --text: #d63e6e;
-  --text2: #e86e96;
-  --text3: #f0a0b8;
-  --card: #fff0f5;
-  --input-bg: #fff5f8;
-  --bubble-mine: #ff6b9d;
-  --bubble-mine-text: #fff;
+  --bg: #fff9e8;
+  --bg2: #fef0d8;
+  --bg3: #fde8c8;
+  --border: #f5d8a8;
+  --text: #5a3e1b;
+  --text2: #8b6b3d;
+  --text3: #c4a56e;
+  --card: #ffffff;
+  --input-bg: #fffdf5;
+  --bubble-mine: #ffde6e;
+  --bubble-mine-text: #5a3e1b;
   --bubble-other: #ffffff;
-  --room-top: #d63e6e;
-  --chat-bg: #fff0f5;
-  --more-hero: #ffe0ec;
-  --section-title: #e86e96;
-  --swipe-bg: #ffe6f0;
-  --chat-item-bg: #ffe6f0;
+  --room-top: #ffde6e;
+  --chat-bg: #f5e6c8;
+  --more-hero: #ffde6e;
+  --section-title: #c4a56e;
+  --swipe-bg: #fff9e8;
+  --chat-item-bg: #fff9e8;
 }
 
-/* 포켓몬 헤더 배경 이미지 */
+/* 헤더 배경 */
 [data-theme="pokemon"] .top-bar {
-  background: linear-gradient(135deg, #ff6b9d, #ff8cae);
+  background: #ffde6e !important;
   position: relative;
   overflow: hidden;
 }
 
-/* 피카츄 이미지 (헤더 오른쪽에 작게) */
+/* 헤더 아이콘 색상 */
+[data-theme="pokemon"] .top-icons i,
+[data-theme="pokemon"] .back-btn,
+[data-theme="pokemon"] .room-icons i {
+  color: #5a3e1b !important;
+}
+
+/* 피카츄 장식 (헤더 오른쪽) */
 [data-theme="pokemon"] .top-bar::after {
-  content: "";
+  content: "⚡";
   position: absolute;
-  right: 10px;
-  bottom: 5px;
-  width: 40px;
-  height: 40px;
-  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png');
-  background-size: contain;
-  background-repeat: no-repeat;
-  opacity: 0.5;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 22px;
+  opacity: 0.6;
   pointer-events: none;
 }
 
-/* 몬스터볼 배경 패턴 */
-  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png');
-  background-repeat: repeat;
-  background-size: 30px;
-  background-position: 5px 5px;
-  opacity: 0.08;
-}
-
-/* 채팅방 배경 (물 포켓몬 느낌) */
+/* 채팅방 배경 */
 [data-theme="pokemon"] #screen-room {
-  background: linear-gradient(180deg, #6eb5d6 0%, #8ec4e0 100%);
-  position: relative;
+  background: linear-gradient(180deg, #a8d8ea 0%, #c8e8f5 100%) !important;
 }
 
-/* 물방울 효과 (잠만보 물방울) */
-[data-theme="pokemon"] #screen-room::before {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 100%;
-  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/134.png');
-  background-repeat: no-repeat;
-  background-position: bottom right;
-  background-size: 120px;
-  opacity: 0.15;
-  pointer-events: none;
-}
-
-/* 내 말풍선에 피카츄 얼굴 */
+/* 내 말풍선 (피카츄 스타일) */
 [data-theme="pokemon"] .bubble.mine {
-  position: relative;
-  background: #ffde6e;
-  color: #2c3e6d;
+  background: #ffde6e !important;
+  color: #5a3e1b !important;
 }
 
-/* 상대방 말풍선에 몬스터볼 */
+/* 상대방 말풍선 */
 [data-theme="pokemon"] .bubble.other {
-  position: relative;
-  background: #ffffff;
+  background: #ffffff !important;
+  color: #5a3e1b !important;
 }
 
-/* 채팅방 상단에 몬스터볼 아이콘 */
+/* 채팅방 상단 */
+[data-theme="pokemon"] .room-top {
+  background: #ffde6e !important;
+}
+
+[data-theme="pokemon"] .room-title {
+  color: #5a3e1b !important;
+}
+
+/* 채팅방 상단 아이콘 (⚡) */
 [data-theme="pokemon"] .room-title::before {
   content: "⚡";
   margin-right: 6px;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 [data-theme="pokemon"] .room-title::after {
   content: "⚡";
   margin-left: 6px;
-  font-size: 16px;
+  font-size: 14px;
 }
 
-/* 더보기 탭에 이상해씨 장식 */
+/* 더보기 헤더 */
 [data-theme="pokemon"] .more-hero {
-  background: linear-gradient(135deg, #7ece7e, #9ee89e);
+  background: #ffde6e !important;
   position: relative;
+  overflow: hidden;
 }
 
+/* 더보기 헤더 장식 */
 [data-theme="pokemon"] .more-hero::before {
-  content: "";
+  content: "🌿";
   position: absolute;
-  left: 10px;
-  bottom: 5px;
-  width: 50px;
-  height: 50px;
-  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png');
-  background-size: contain;
-  background-repeat: no-repeat;
-  opacity: 0.3;
+  left: 12px;
+  bottom: 8px;
+  font-size: 24px;
+  opacity: 0.4;
 }
 
 [data-theme="pokemon"] .more-hero::after {
-  content: "";
+  content: "🔥";
   position: absolute;
-  right: 10px;
-  top: 5px;
-  width: 45px;
-  height: 45px;
-  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png');
-  background-size: contain;
-  background-repeat: no-repeat;
-  opacity: 0.3;
+  right: 12px;
+  top: 8px;
+  font-size: 22px;
+  opacity: 0.4;
 }
 
-/* 탭바에 몬스터볼 아이콘 */
+/* 탭바 (활성화된 탭) */
+[data-theme="pokemon"] .tab-btn.active {
+  color: #ff6b9d !important;
+}
+
 [data-theme="pokemon"] .tab-btn.active i {
-  text-shadow: 0 0 5px #ffde6e;
+  text-shadow: 0 0 3px #ffde6e;
 }
 
-/* 로딩 스피너 (몬스터볼 회전) */
+/* 로딩 스피너 */
 [data-theme="pokemon"] .loading-spinner {
   width: 40px;
   height: 40px;
@@ -555,10 +540,8 @@ html, body {
 }
 
 /* ============================================================
-   몬스터볼 테마 카드 스타일
+   몬스터볼 테마 카드 스타일 (테마 선택 화면용)
    ============================================================ */
-
-/* 몬스터볼 원형 (아래가 흰색인 버전) */
 .monster-ball-circle {
   width: 36px;
   height: 36px;
@@ -571,7 +554,7 @@ html, body {
   box-shadow: 0 0 0 2px #333, 0 0 0 4px #ddd;
 }
 
-/* 빨간색 윗부분 (50%만 빨간색) */
+/* 빨간색 윗부분 */
 .monster-ball-circle::before {
   content: "";
   position: absolute;
@@ -597,12 +580,7 @@ html, body {
   z-index: 2;
 }
 
-/* 가로 줄무늬 (가운데 선) */
-.monster-ball-circle .monster-ball-line {
-  display: none;
-}
-
-/* 호버 시 살짝 회전 */
+/* 호버 애니메이션 */
 .theme-pokemon-card:hover .monster-ball-circle {
   transform: rotate(15deg);
   animation: shake 0.3s ease-in-out;
@@ -613,7 +591,7 @@ html, body {
   50% { transform: rotate(20deg); }
 }
 
-/* 선택된 테마일 때 몬스터볼 강조 */
+/* 선택된 테마 강조 */
 .theme-card.selected .monster-ball-circle {
   box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #333;
   animation: glow 0.5s ease;
