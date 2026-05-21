@@ -520,13 +520,26 @@ async function renderChats() {
     }
   }
 
-  // 3. 정렬: 고정된 방 우선, 그 다음 최신순
+  // 3. ✅ 안 읽은 메시지 개수를 한 번에 조회
+  const { data: unreadData } = await supabaseClient
+    .from('messages')
+    .select('room_id, read_by')
+    .in('room_id', roomIds)
+    .neq('sender_id', currentUserId);
+
+  // 안 읽은 개수 계산
+  const unreadCountMap = {};
+  for (const msg of unreadData || []) {
+    const readBy = msg.read_by || [];
+    if (!readBy.includes(currentUserId)) {
+      unreadCountMap[msg.room_id] = (unreadCountMap[msg.room_id] || 0) + 1;
+    }
+  }
+
+  // 4. 정렬: 고정된 방 우선, 그 다음 최신순
   const sorted = [...chatRoomsList].sort((a, b) => {
-    // 고정된 방 먼저
     if (a.is_pinned && !b.is_pinned) return -1;
     if (!a.is_pinned && b.is_pinned) return 1;
-    
-    // 둘 다 고정이거나 둘 다 일반이면 최신순
     const timeA = lastTimeMap[a.id] || a.created_at || 0;
     const timeB = lastTimeMap[b.id] || b.created_at || 0;
     return new Date(timeB) - new Date(timeA);
@@ -540,7 +553,7 @@ async function renderChats() {
     return;
   }
 
-  // 4. 필터링된 방들의 마지막 메시지 내용 조회
+  // 5. 필터링된 방들의 마지막 메시지 내용 조회
   const filteredRoomIds = filtered.map(r => r.id);
   const { data: lastMsgs } = await supabaseClient
     .from('messages')
@@ -571,6 +584,7 @@ async function renderChats() {
     }
     
     const isPinned = room.is_pinned || false;
+    const unreadCount = unreadCountMap[room.id] || 0;
     let avatarHtml = '';
     
     if (!room.is_group) {
@@ -606,6 +620,7 @@ async function renderChats() {
           </div>
           <div class="ci-row2">
             <span class="ci-preview">${displayMsg}</span>
+            ${unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : ''}
           </div>
         </div>
       </div>
@@ -815,6 +830,7 @@ async function openRoomFromData(roomId) {
     .subscribe();
 
   await loadMessages(room.id);
+  await markMessagesAsRead(room.id);
 }
 
 async function loadMessages(roomId) {
@@ -1966,4 +1982,24 @@ async function respondToFriendRequest(requestId, action) {
   
   await loadFriendRequests();
   renderFriendRequests();
+}
+// 채팅방 열리면 모든 메시지를 읽음 처리
+async function markMessagesAsRead(roomId) {
+  const { data: messages } = await supabaseClient
+    .from('messages')
+    .select('id, read_by')
+    .eq('room_id', roomId)
+    .neq('sender_id', currentUserId);  // 내가 보낸 메시지는 제외
+  
+  for (const msg of messages || []) {
+    const readBy = msg.read_by || [];
+    if (!readBy.includes(currentUserId)) {
+      await supabaseClient
+        .from('messages')
+        .update({ read_by: [...readBy, currentUserId] })
+        .eq('id', msg.id);
+    }
+  }
+  
+  renderChats(); // 목록 새로고침
 }
