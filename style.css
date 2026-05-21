@@ -437,10 +437,44 @@ html, body {
 }
 
 /* ============================================================
+   포켓몬 테마 (개인용) - 진짜 포켓몬 이미지 + 배경 ver
+   ============================================================ */
+[data-theme="pokemon"] {
+  --bg: #fff9e8;
+  --bg2: #fef0d8;
+  --bg3: #fde8c8;
+  --border: #f5d8a8;
+  --text: #5a3e1b;
+  --text2: #8b6b3d;
+  --text3: #c4a56e;
+  --card: #ffffff;
+  --input-bg: #fffdf5;
+  --bubble-mine: #ffde6e;
+  --bubble-mine-text: #5a3e1b;
+  --bubble-other: #ffffff;
+  --room-top: #ffde6e;
+  --chat-bg: #a8d8ea;
+  --more-hero: #ffde6e;
+  --section-title: #c4a56e;
+  --swipe-bg: #fff9e8;
+  --chat-item-bg: #fff9e8;
+}
+
+/* 헤더 배경 */
+[data-theme="pokemon"] .top-bar {
+  background: #ffde6e !important;
+}
+
+/* 헤더 아이콘 색상 */
+[data-theme="pokemon"] .top-icons i,
+[data-theme="pokemon"] .back-btn,
+[data-theme="pokemon"] .room-icons i {
+  color: #5a3e1b !important;
+}
+
+/* ============================================================
    탭바 아이콘을 진짜 포켓몬 이미지로 변경
    ============================================================ */
-
-/* 친구 탭 (이상해씨) */
 [data-theme="pokemon"] #tab-friends i {
   background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png') !important;
   background-size: contain !important;
@@ -451,13 +485,8 @@ html, body {
   height: 28px;
   display: inline-block;
 }
+[data-theme="pokemon"] #tab-friends i::before { content: "" !important; display: none; }
 
-[data-theme="pokemon"] #tab-friends i::before {
-  content: "" !important;
-  display: none;
-}
-
-/* 채팅 탭 (파이리) */
 [data-theme="pokemon"] #tab-chats i {
   background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png') !important;
   background-size: contain !important;
@@ -468,13 +497,8 @@ html, body {
   height: 28px;
   display: inline-block;
 }
+[data-theme="pokemon"] #tab-chats i::before { content: "" !important; display: none; }
 
-[data-theme="pokemon"] #tab-chats i::before {
-  content: "" !important;
-  display: none;
-}
-
-/* 더보기 탭 (꼬북이) */
 [data-theme="pokemon"] #tab-more i {
   background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png') !important;
   background-size: contain !important;
@@ -485,13 +509,8 @@ html, body {
   height: 28px;
   display: inline-block;
 }
+[data-theme="pokemon"] #tab-more i::before { content: "" !important; display: none; }
 
-[data-theme="pokemon"] #tab-more i::before {
-  content: "" !important;
-  display: none;
-}
-
-/* 모든 탭 버튼 아이콘 통일 */
 [data-theme="pokemon"] .tab-btn i {
   font-size: 0 !important;
   width: 28px;
@@ -503,57 +522,43 @@ html, body {
    채팅방 배경 (포켓몬 이미지)
    ============================================================ */
 [data-theme="pokemon"] #screen-room {
-  background: linear-gradient(180deg, #a8d8ea 0%, #c8e8f5 100%) !important;
+  background: #a8d8ea !important;
   position: relative;
+  overflow: hidden;
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png'),
+                    url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png'),
+                    url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png'),
+                    url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png') !important;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat !important;
+  background-position: bottom right, bottom left, top right, top left !important;
+  background-size: 100px, 90px, 80px, 80px !important;
 }
 
-/* 채팅방 배경: 피카츄 (오른쪽 하단) */
 [data-theme="pokemon"] #screen-room::before {
   content: "";
   position: absolute;
-  bottom: 10px;
-  right: 10px;
-  width: 100px;
-  height: 100px;
-  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png');
-  background-size: contain;
-  background-repeat: no-repeat;
-  opacity: 0.15;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(168, 216, 234, 0.2);
   pointer-events: none;
   z-index: 0;
 }
 
-/* 채팅방 배경: 이상해씨 (왼쪽 하단) */
-[data-theme="pokemon"] #screen-room::after {
-  content: "";
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  width: 90px;
-  height: 90px;
-  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png');
-  background-size: contain;
-  background-repeat: no-repeat;
-  opacity: 0.12;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* 메시지들이 배경 위에 보이게 */
 [data-theme="pokemon"] #room-messages {
   position: relative;
   z-index: 1;
+  background: transparent !important;
 }
 
-/* 내 말풍선 */
+/* 말풍선 */
 [data-theme="pokemon"] .bubble.mine {
   background: #ffde6e !important;
   color: #5a3e1b !important;
 }
-
-/* 상대방 말풍선 */
 [data-theme="pokemon"] .bubble.other {
-  background: #ffffff !important;
+  background: rgba(255, 255, 255, 0.95) !important;
   color: #5a3e1b !important;
 }
 
@@ -561,7 +566,6 @@ html, body {
 [data-theme="pokemon"] .room-top {
   background: #ffde6e !important;
 }
-
 [data-theme="pokemon"] .room-title {
   color: #5a3e1b !important;
 }
@@ -576,7 +580,7 @@ html, body {
   color: #ff6b9d !important;
 }
 
-/* 로딩 스피너 (몬스터볼) */
+/* 로딩 스피너 */
 [data-theme="pokemon"] .loading-spinner {
   width: 40px;
   height: 40px;
@@ -585,14 +589,13 @@ html, body {
   background-size: contain;
   animation: pokemon-spin 1s infinite linear;
 }
-
 @keyframes pokemon-spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
 /* ============================================================
-   몬스터볼 테마 카드 스타일 (테마 선택 화면용)
+   몬스터볼 테마 카드 스타일
    ============================================================ */
 .monster-ball-circle {
   width: 36px;
@@ -605,8 +608,6 @@ html, body {
   overflow: hidden;
   box-shadow: 0 0 0 2px #333, 0 0 0 4px #ddd;
 }
-
-/* 빨간색 윗부분 */
 .monster-ball-circle::before {
   content: "";
   position: absolute;
@@ -617,8 +618,6 @@ html, body {
   background: #ff4757;
   z-index: 0;
 }
-
-/* 가운데 버튼 */
 .monster-ball-circle::after {
   content: "";
   position: absolute;
@@ -631,27 +630,20 @@ html, body {
   transform: translate(-50%, -50%);
   z-index: 2;
 }
-
-/* 호버 애니메이션 */
 .theme-pokemon-card:hover .monster-ball-circle {
   transform: rotate(15deg);
   animation: shake 0.3s ease-in-out;
 }
-
 @keyframes shake {
   0%, 100% { transform: rotate(0deg); }
   50% { transform: rotate(20deg); }
 }
-
-/* 선택된 테마 강조 */
 .theme-card.selected .monster-ball-circle {
   box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #333;
   animation: glow 0.5s ease;
 }
-
 @keyframes glow {
   0% { box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #333; }
   50% { box-shadow: 0 0 0 6px #ffde6e, 0 0 0 8px #333; }
   100% { box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #333; }
 }
-
