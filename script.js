@@ -1698,7 +1698,7 @@ function startGlobalRealtime() {
       
       const sender = friendsList.find(f => f.id === msg.sender_id);
       showChatNotification(sender?.name || room?.name || '누군가', msg.content || '사진', sender?.avatar, msg.room_id);
-      renderChats();
+      await renderChats();
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async (payload) => {
       const updatedProfile = payload.new;
