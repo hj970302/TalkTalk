@@ -121,23 +121,31 @@ window.addEventListener('DOMContentLoaded', async () => { await initApp(); });
 
 async function initApp() {
   const authScreen = document.getElementById('auth-screen');
+  const splashLogo = document.getElementById('splash-logo');
   const savedSession = localStorage.getItem('talktalk_session');
+  
   if (savedSession) {
     try {
       const { data: { session }, error } = await supabaseClient.auth.getSession();
       if (!error && session?.user) {
         currentUserId = session.user.id;
         await loadUserData(session.user.id);
-        if (authScreen) authScreen.style.display = 'none';
+        if (authScreen) {
+          authScreen.style.display = 'none';  // 인증 화면 완전 숨김
+        }
         showToast("환영합니다", `${currentUserProfile?.name || '사용자'}님, 자동 로그인되었습니다.`, "#fee500");
         return;
       }
     } catch(e) {}
   }
-  if (authScreen) authScreen.style.display = 'flex';
+  
+  // 로그인 안 된 경우에만 스플래시 표시
+  if (authScreen) {
+    authScreen.style.display = 'flex';
+    splashLogo.style.display = 'flex';
+  }
   setTimeout(() => {
-    const splash = document.getElementById('splash-logo');
-    if (splash) splash.style.display = 'none';
+    if (splashLogo) splashLogo.style.display = 'none';
     toggleAuthForm('login');
   }, 1500);
 }
@@ -588,7 +596,7 @@ async function openRoomFromData(roomId) {
     chatRoomsList.push(room);
   }
   
-  // 👇 추가: 멤버 정보가 없으면 가져오기 (이 부분이 추가됨)
+  // 멤버 정보 추가
   if (!room.members || room.members.length === 0) {
     const { data: memberRows } = await supabaseClient
       .from('chat_room_members')
@@ -600,7 +608,11 @@ async function openRoomFromData(roomId) {
   currentRoom = room;
   roomOpen = true;
 
-  document.getElementById('room-title').textContent = room.name || '채팅방';
+  // 👇 여기 수정: 멤버 수 표시
+  const memberCount = room.members?.length || 0;
+  const roomTitle = room.name || (room.is_group ? '단체방' : '대화');
+  document.getElementById('room-title').innerHTML = `${roomTitle} <span style="font-size:12px; opacity:0.7; font-weight:normal;">(${memberCount})</span>`;
+  
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-room').classList.add('active');
   document.getElementById('tab-bar').style.display = 'none';
@@ -616,7 +628,6 @@ async function openRoomFromData(roomId) {
       const msg = payload.new;
       if (msg.room_id !== room.id) return;
       if (msg.sender_id === currentUserId) return;
-      // 차단된 사용자 메시지 무시
       if (blockedList.includes(msg.sender_id)) return;
       if (!roomOpen || currentRoom.id !== room.id) {
         const sender = friendsList.find(f => f.id === msg.sender_id);
