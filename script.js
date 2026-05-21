@@ -1658,15 +1658,40 @@ function startGlobalRealtime() {
       const myRoomIds = chatRoomsList.map(r => r.id);
       
       if (!myRoomIds.includes(msg.room_id)) {
-        await supabaseClient.from('chat_room_members').insert({
-          room_id: msg.room_id,
-          user_id: currentUserId
-        });
+        // ✅ 중복 삽입 방지
+        const { data: existing } = await supabaseClient
+          .from('chat_room_members')
+          .select('room_id')
+          .eq('room_id', msg.room_id)
+          .eq('user_id', currentUserId)
+          .maybeSingle();
+        
+        if (!existing) {
+          await supabaseClient.from('chat_room_members').insert({
+            room_id: msg.room_id,
+            user_id: currentUserId
+          });
+        }
+        
         await loadChatRooms();
         renderChats();
         return;
       }
       
+      if (roomOpen && currentRoom.id === msg.room_id) return;
+      
+      const room = chatRoomsList.find(r => r.id === msg.room_id);
+      if (room?.is_muted) return;
+      
+      const sender = friendsList.find(f => f.id === msg.sender_id);
+      showChatNotification(sender?.name || room?.name || '누군가', msg.content || '사진', sender?.avatar, msg.room_id);
+      await renderChats();
+    })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async (payload) => {
+      // ... 기존 프로필 업데이트 코드 ...
+    })
+    .subscribe();
+}
       if (roomOpen && currentRoom.id === msg.room_id) return;
       
       const room = chatRoomsList.find(r => r.id === msg.room_id);
