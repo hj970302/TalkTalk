@@ -438,32 +438,34 @@ function makeFriendItemHTML(f) {
 async function renderChats() {
   const container = document.getElementById('chats-list-container');
   if (!container) return;
-  
-  const filtered = chatRoomsList.filter(c => 
+
+  const filtered = chatRoomsList.filter(c =>
     c.name?.toLowerCase().includes(chatSearchQuery.toLowerCase())
   );
-  
+
   if (filtered.length === 0) {
     container.innerHTML = `<div class="empty-state"><p>채팅방이 없습니다.</p></div>`;
     return;
   }
-  
+
   container.innerHTML = '';
   for (const room of filtered) {
     const { data: lastMsg } = await supabaseClient
       .from('messages')
-      .select('text, is_image, created_at')
+      .select('content, type, created_at')   // ← text → content
       .eq('room_id', room.id)
       .order('created_at', { ascending: false })
       .limit(1);
-    
+
     const lastChat = lastMsg?.[0];
-    let displayMsg = lastChat ? (lastChat.is_image ? "📸 사진" : lastChat.text?.substring(0, 30)) : "대화 내역 없음";
-    
+    let displayMsg = lastChat
+      ? (lastChat.type === 'image' ? '📸 사진' : lastChat.content?.substring(0, 30))
+      : '대화 내역 없음';
+
     const wrapper = document.createElement('div');
     wrapper.className = 'chat-item-wrapper';
     wrapper.setAttribute('data-id', room.id);
-    
+
     wrapper.innerHTML = `
       <div class="chat-swipe-actions">
         <button class="swa-btn swa-pin" onclick="chatSwipeAction('pin','${room.id}')"><i class="ti ti-pin"></i><span>고정</span></button>
@@ -489,77 +491,55 @@ async function renderChats() {
 /* ==========================================================================
    채팅방 열기
    ========================================================================== */
-async function openRoomFromData(targetId) {
-  // targetId는 상대방의 profile ID
-  let room = chatRoomsList.find(r => 
-    !r.is_group && r.members?.includes(targetId)
-  );
-  
-  // 채팅방이 없으면 새로 생성
+async function openRoomFromData(roomId) {
+  // roomId로 방을 직접 찾음
+  let room = chatRoomsList.find(r => r.id === roomId);
+
   if (!room) {
-    const friend = friendsList.find(f => f.id === targetId);
-    if (!friend) {
-      showToast("오류", "친구 정보를 찾을 수 없습니다.", "#ff4757");
+    // DB에서 다시 조회
+    const { data: roomData } = await supabaseClient
+      .from('chat_rooms')
+      .select('*')
+      .eq('id', roomId)
+      .single();
+    if (!roomData) {
+      showToast("오류", "채팅방을 찾을 수 없습니다.", "#ff4757");
       return;
     }
-    
-    // 새 채팅방 생성
-    const { data: newRoom, error: roomError } = await supabaseClient
-  .from('chat_rooms')
-  .insert({ name: friend.name, is_group: false })
-  .select()
-  .single();
-    
-    if (roomError) {
-      console.error("방 생성 오류:", roomError);
-      showToast("오류", "채팅방을 만들 수 없습니다.", "#ff4757");
-      return;
-    }
-    
-    // 채팅방 멤버 추가
-    await supabaseClient.from('chat_room_members').insert([
-      { room_id: newRoom.id, user_id: currentUserId },
-      { room_id: newRoom.id, user_id: targetId }
-    ]);
-    
-    newRoom.members = [currentUserId, targetId];
-    chatRoomsList.push(newRoom);
-    room = newRoom;
+    room = roomData;
+    chatRoomsList.push(room);
   }
-  
+
   currentRoom = room;
   roomOpen = true;
-  
+
   document.getElementById('room-title').textContent = room.name || '채팅방';
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-room').classList.add('active');
   document.getElementById('tab-bar').style.display = 'none';
-  
-  // 실시간 구독 설정
+
   if (messagesSubscription) {
     supabaseClient.removeChannel(messagesSubscription);
   }
-  
+
   messagesSubscription = supabaseClient
     .channel(`room-${room.id}`)
-    .on('postgres_changes', { 
-      event: 'INSERT', 
-      schema: 'public', 
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
       table: 'messages',
       filter: `room_id=eq.${room.id}`
     }, (payload) => {
-  // 내가 보낸 메시지는 sendMsg에서 이미 추가했으므로 중복 방지
-  if (payload.new.sender_id === currentUserId) return;
-
-  if (!roomOpen || currentRoom.id !== room.id) {
-    const sender = friendsList.find(f => f.id === payload.new.sender_id);
-    showChatNotification(sender?.name || '누군가', payload.new.content || '사진', sender?.avatar);
-  } else {
-    appendMessageToUI(payload.new);
-  }
-})
+      if (payload.new.sender_id === currentUserId) return; // 내 메시지 중복 방지
+      if (!roomOpen || currentRoom.id !== room.id) {
+        const sender = friendsList.find(f => f.id === payload.new.sender_id);
+        showChatNotification(sender?.name || '누군가', payload.new.content || '사진', sender?.avatar);
+      } else {
+        appendMessageToUI(payload.new);
+      }
+    })
     .subscribe();
-  
+
   await loadMessages(room.id);
 }
 async function loadMessages(roomId) {
@@ -662,13 +642,13 @@ async function sendMsg() {
       content: text,
       type: 'text'
     })
-    .select()   // ← 이게 핵심! 삽입된 행을 반환받음
+    .select()
     .single();
 
   if (error) {
     alert("오류: " + error.message);
   } else {
-    appendMessageToUI(data);   // ← 직접 UI에 추가
+    appendMessageToUI(data);
     renderChats();
   }
 }
