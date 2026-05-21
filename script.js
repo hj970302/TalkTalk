@@ -472,35 +472,35 @@ document.addEventListener('mousedown', e => {
 /* ============================================================
    채팅 목록 렌더링
    ============================================================ */
+let isRenderingChats = false;
+
 async function renderChats() {
+  if (isRenderingChats) return;
+  isRenderingChats = true;
+
   const container = document.getElementById('chats-list-container');
-  if (!container) return;
+  if (!container) { isRenderingChats = false; return; }
   const sorted = [...chatRoomsList].sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
   const filtered = sorted.filter(c => c.name?.toLowerCase().includes(chatSearchQuery.toLowerCase()));
   if (filtered.length === 0) {
     container.innerHTML = `<div class="empty-state"><p>채팅방이 없습니다.</p></div>`;
+    isRenderingChats = false;
     return;
   }
-
-  // 모든 채팅방 마지막 메시지 한번에 가져오기
   const roomIds = filtered.map(r => r.id);
   const { data: allLastMsgs } = await supabaseClient
     .from('messages')
     .select('room_id, content, type, created_at')
     .in('room_id', roomIds)
     .order('created_at', { ascending: false });
-
-  // 채팅방별 마지막 메시지 정리
   const lastMsgMap = {};
   for (const msg of allLastMsgs || []) {
     if (!lastMsgMap[msg.room_id]) lastMsgMap[msg.room_id] = msg;
   }
-
   container.innerHTML = '';
   for (const room of filtered) {
     const lastChat = lastMsgMap[room.id];
     if (!lastChat) continue;
-
     let displayMsg = lastChat.type === 'image' ? '📸 사진' : (lastChat.content?.substring(0, 30) || '');
     let displayTime = '';
     if (lastChat.created_at) {
@@ -508,7 +508,6 @@ async function renderChats() {
       const h = d.getHours(); const m = String(d.getMinutes()).padStart(2, '0');
       displayTime = `${h >= 12 ? '오후' : '오전'} ${h % 12 || 12}:${m}`;
     }
-
     const isPinned = room.is_pinned || false;
     let avatarHtml = '';
     if (!room.is_group) {
@@ -522,7 +521,6 @@ async function renderChats() {
     } else {
       avatarHtml = `<div class="chat-avatar avatar-base"><i class="ti ti-users"></i></div>`;
     }
-
     const wrapper = document.createElement('div');
     wrapper.className = 'chat-item-wrapper';
     wrapper.setAttribute('data-id', room.id);
@@ -551,6 +549,7 @@ async function renderChats() {
     container.appendChild(wrapper);
     attachSwipeToItem(wrapper);
   }
+  isRenderingChats = false;
 }
 
 async function chatSwipeAction(action, roomId) {
