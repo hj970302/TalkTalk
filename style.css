@@ -595,7 +595,7 @@ html, body {
 
 /* 채팅방 배경 */
 [data-theme="pokemon"] #screen-room {
-  /*background-image: url('https://yrndqghsdtxoajgxvqrv.supabase.co/storage/v1/object/public/chat-images/pokemon.jpg') !important;*/
+  background-image: url('https://yrndqghsdtxoajgxvqrv.supabase.co/storage/v1/object/public/chat-images/pokemon.jpg') !important;
   background-size: cover !important;
   background-position: center !important;
   background-repeat: no-repeat !important;
