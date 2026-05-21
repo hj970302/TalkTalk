@@ -151,14 +151,13 @@ async function initApp() {
 async function loadUserData(userId) {
   const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
   if (profile) { currentUserProfile = profile; syncMyProfileDOM(); }
-  await loadBlockedList();
-  await loadFriends();
-  await loadChatRooms();
+  
+  await Promise.all([loadBlockedList(), loadFriends(), loadChatRooms()]); 
+  
   renderFriends();
   renderChats();
   checkUnreadDots();
   startGlobalRealtime();
-  // 관리자 패널
   if (currentUserProfile?.is_admin) {
     const btn = document.getElementById('admin-panel-btn');
     if (btn) btn.style.display = 'flex';
