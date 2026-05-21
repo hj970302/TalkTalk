@@ -162,6 +162,17 @@ async function loadUserData(userId) {
     const btn = document.getElementById('admin-panel-btn');
     if (btn) btn.style.display = 'flex';
   }
+
+  // OneSignal player_id 저장
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal) {
+    const playerId = await OneSignal.User.PushSubscription.id;
+    if (playerId) {
+      await supabaseClient.from('profiles')
+        .update({ onesignal_player_id: playerId })
+        .eq('id', userId);
+    }
+  });
 }
 
 async function loadBlockedList() {
@@ -763,6 +774,63 @@ function makeMetaEl() {
 /* ============================================================
    메시지 전송
    ============================================================ */
+async function sendPushNotification(text) {
+  try {
+    const otherIds = currentRoom.members?.filter(id => id !== currentUserId) || [];
+    if (otherIds.length === 0) return;
+
+    const { data: profiles } = await supabaseClient
+      .from('profiles')
+      .select('onesignal_player_id')
+      .in('id', otherIds);
+
+    const playerIds = profiles?.map(p => p.onesignal_player_id).filter(Boolean) || [];
+    if (playerIds.length === 0) return;
+
+    await fetch('https://yrndqghsdtxoajgxvqrv.supabase.co/functions/v1/send-notification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        player_ids: playerIds,
+        title: currentUserProfile?.name || '톡톡',
+        message: text,
+        url: 'https://talk-talk-phi.vercel.app'
+      })
+    });
+  } catch(e) {
+    console.error('알림 전송 실패:', e);
+  }
+}
+async function sendPushNotification(text) {
+  try {
+    // 채팅방 멤버 중 나 제외한 상대방 OneSignal player_id 가져오기
+    const otherIds = currentRoom.members?.filter(id => id !== currentUserId) || [];
+    if (otherIds.length === 0) return;
+
+    // profiles에서 onesignal_player_id 가져오기
+    const { data: profiles } = await supabaseClient
+      .from('profiles')
+      .select('onesignal_player_id')
+      .in('id', otherIds);
+
+    const playerIds = profiles?.map(p => p.onesignal_player_id).filter(Boolean) || [];
+    if (playerIds.length === 0) return;
+
+    await fetch('https://yrndqghsdtxoajgxvqrv.supabase.co/functions/v1/send-notification', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        player_ids: playerIds,
+        title: currentUserProfile?.name || '톡톡',
+        message: text,
+        url: 'https://talk-talk-phi.vercel.app'
+      })
+    });
+  } catch(e) {
+    console.error('알림 전송 실패:', e);
+  }
+}
+
 async function sendMsg() {
   const input = document.getElementById('msg-input');
   const text = input?.value.trim();
@@ -777,8 +845,8 @@ async function sendMsg() {
     alert("오류: " + error.message); 
   } else { 
     appendMessageToUI(data); 
-    // renderChats() 호출 제거 또는 조건부 호출
-    if (!roomOpen) renderChats();  // 채팅방 닫혀있을 때만 갱신
+    if (!roomOpen) renderChats();
+    sendPushNotification(text);
   }
 }
 
@@ -790,11 +858,9 @@ async function handleClipFile(inputElement) {
     return;
   }
   
-  // 파일명 생성 (유니크하게)
   const ext = file.name.split('.').pop();
   const fileName = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 8)}.${ext}`;
   
-  // 1. Storage에 업로드
   const { error: uploadError } = await supabaseClient.storage
     .from('chat-images')
     .upload(fileName, file);
@@ -806,12 +872,10 @@ async function handleClipFile(inputElement) {
     return;
   }
   
-  // 2. public URL 얻기
   const { data: urlData } = supabaseClient.storage
     .from('chat-images')
     .getPublicUrl(fileName);
   
-  // 3. DB에 URL만 저장
   const { data, error: dbError } = await supabaseClient.from('messages').insert({
     room_id: currentRoom.id,
     sender_id: currentUserId,
@@ -825,11 +889,11 @@ async function handleClipFile(inputElement) {
   } else {
     appendMessageToUI(data);
     if (!roomOpen) renderChats();
+    sendPushNotification('📷 사진');
   }
   
   inputElement.value = "";
 }
-
 function triggerClip() { 
   document.getElementById('clip-file-input')?.click(); 
 }
