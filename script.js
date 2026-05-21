@@ -608,7 +608,10 @@ async function chatSwipeAction(action, roomId) {
   } else if (action === 'leave') {
     if (!confirm("채팅방에서 나가시겠습니까? 나가면 대화 내용이 삭제됩니다.")) return;
     
-    // 일반 채팅방: 내 화면에서만 메시지 숨김
+    // ✅ 멤버 삭제하지 않음! (채팅방 재입장을 위해 DB 멤버는 유지)
+    // await supabaseClient.from('chat_room_members').delete().eq('room_id', roomId).eq('user_id', currentUserId);
+    
+    // 1. 모든 메시지에 내 ID를 deleted_for_me 배열에 추가 (내 화면에서만 숨김)
     const { data: messages } = await supabaseClient
       .from('messages')
       .select('id, deleted_for_me')
@@ -624,26 +627,16 @@ async function chatSwipeAction(action, roomId) {
       }
     }
     
-    // 채팅방 멤버에서 제거
-    await supabaseClient
-      .from('chat_room_members')
-      .delete()
-      .eq('room_id', roomId)
-      .eq('user_id', currentUserId);
+    // 2. 채팅방 목록에서만 제거 (UI에서 숨김)
+    chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
     
-    // 방에 아무도 없으면 방 자체도 삭제
-    const { count } = await supabaseClient
-      .from('chat_room_members')
-      .select('*', { count: 'exact', head: true })
-      .eq('room_id', roomId);
-    
-    if (count === 0) {
-      await supabaseClient.from('chat_rooms').delete().eq('id', roomId);
+    // 3. 현재 채팅방 열려있으면 닫기
+    if (roomOpen && currentRoom.id === roomId) {
+      closeRoom();
     }
     
-    chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
-    showToast("채팅방", "채팅방에서 나갔습니다. 대화 내용이 삭제되었습니다.", "#ff4757");
     renderChats();
+    showToast("채팅방", "채팅방에서 나갔습니다. 대화 내용이 삭제되었습니다.", "#ff4757");
   }
 }
 
@@ -651,35 +644,39 @@ async function chatSwipeAction(action, roomId) {
    채팅방 열기
    ============================================================ */
 async function openRoomWithFriend(friendId) {
-  // 1. 기존 채팅방 찾기
+  // 1. 기존 채팅방 찾기 (항상 존재함)
   let room = chatRoomsList.find(r => !r.is_group && r.members?.includes(friendId) && r.members?.includes(currentUserId));
   
   if (!room) {
-    // DB에서 직접 찾기
-    const { data: memberRows } = await supabaseClient
+    // 2. DB에서 찾기 (멤버는 유지되므로 무조건 있음)
+    const { data: existingRoom } = await supabaseClient
       .from('chat_room_members')
-      .select('room_id')
-      .eq('user_id', friendId);
+      .select('room_id, chat_rooms(*)')
+      .eq('user_id', currentUserId)
+      .eq('chat_rooms.is_group', false);
     
-    const friendRoomIds = memberRows?.map(r => r.room_id) || [];
+    const myRoomIds = existingRoom?.map(r => r.room_id) || [];
     
-    if (friendRoomIds.length > 0) {
-      const { data: myRows } = await supabaseClient
+    if (myRoomIds.length > 0) {
+      const { data: sharedRooms } = await supabaseClient
         .from('chat_room_members')
         .select('room_id')
-        .eq('user_id', currentUserId)
-        .in('room_id', friendRoomIds);
+        .eq('user_id', friendId)
+        .in('room_id', myRoomIds);
       
-      if (myRows?.length > 0) {
+      if (sharedRooms && sharedRooms.length > 0) {
         const { data: roomData } = await supabaseClient
           .from('chat_rooms')
           .select('*')
-          .eq('id', myRows[0].room_id)
-          .eq('is_group', false)
+          .eq('id', sharedRooms[0].room_id)
           .single();
         
         if (roomData) {
-          roomData.members = [currentUserId, friendId];
+          const { data: members } = await supabaseClient
+            .from('chat_room_members')
+            .select('user_id')
+            .eq('room_id', roomData.id);
+          roomData.members = members?.map(m => m.user_id) || [];
           chatRoomsList.push(roomData);
           room = roomData;
         }
@@ -687,7 +684,7 @@ async function openRoomWithFriend(friendId) {
     }
   }
   
-  // 2. 없으면 새로 생성
+  // 3. 진짜 없으면 (처음 대화) 새로 생성
   if (!room) {
     const friend = friendsList.find(f => f.id === friendId);
     if (!friend) {
