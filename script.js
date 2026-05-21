@@ -1358,14 +1358,6 @@ if (!myRoomIds.includes(msg.room_id)) {
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async (payload) => {
       const updatedProfile = payload.new;
       
-      // 내 프로필이 업데이트된 경우
-      if (updatedProfile.id === currentUserId) {
-        currentUserProfile = updatedProfile;
-        syncMyProfileDOM();
-        showToast("프로필", "내 프로필이 업데이트되었습니다.", "#2ed573");
-        return;
-      }
-      
       // 친구 목록에 있는 친구의 프로필이 업데이트된 경우
       const friendIndex = friendsList.findIndex(f => f.id === updatedProfile.id);
       if (friendIndex !== -1) {
