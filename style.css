@@ -554,3 +554,69 @@ html, body {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* ============================================================
+   몬스터볼 테마 카드 스타일
+   ============================================================ */
+
+/* 몬스터볼 원형 */
+.monster-ball-circle {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 35%, white 28%, #ff4757 28%);
+  box-shadow: 0 0 0 2px #333, 0 0 0 4px #ddd, inset 0 -12px 0 0 #ff4757;
+  position: relative;
+  transition: transform 0.3s ease;
+}
+
+/* 가운데 버튼 */
+.monster-ball-circle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  background: #333;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+/* 가로 줄무늬 */
+.monster-ball-circle::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #333;
+  transform: translateY(-50%);
+  z-index: 0;
+}
+
+/* 호버 시 살짝 회전 */
+.theme-pokemon-card:hover .monster-ball-circle {
+  transform: rotate(15deg);
+  animation: shake 0.3s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(20deg); }
+}
+
+/* 선택된 테마일 때 몬스터볼 강조 */
+.theme-card.selected .monster-ball-circle {
+  box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #333, inset 0 -12px 0 0 #ff4757;
+  animation: glow 0.5s ease;
+}
+
+@keyframes glow {
+  0% { box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #333; }
+  50% { box-shadow: 0 0 0 6px #ffde6e, 0 0 0 8px #333; }
+  100% { box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #333; }
+}
