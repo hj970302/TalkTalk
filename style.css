@@ -522,16 +522,16 @@ html, body {
    채팅방 배경 (포켓몬 이미지)
    ============================================================ */
 [data-theme="pokemon"] #screen-room {
-  background: #a8d8ea !important;
+  background-image: url('https://yrndqghsdtxoajgxvqrv.supabase.co/storage/v1/object/public/chat-images/poketmon.jpg') !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
   position: relative;
   overflow: hidden;
-  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png'),
-                    url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png'),
-                    url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png'),
-                    url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png') !important;
-  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat !important;
-  background-position: bottom right, bottom left, top right, top left !important;
-  background-size: 100px, 90px, 80px, 80px !important;
+}
+
+[data-theme="pokemon"] #screen-room::before {
+  display: none !important;
 }
 
 [data-theme="pokemon"] #screen-room::before {
@@ -585,7 +585,7 @@ html, body {
   width: 40px;
   height: 40px;
   margin: 20px auto;
-  background-image: url('https://yrndqghsdtxoajgxvqrv.supabase.co/storage/v1/object/public/chat-images/poketmon.jpg');
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png');
   background-size: contain;
   animation: pokemon-spin 1s infinite linear;
 }
