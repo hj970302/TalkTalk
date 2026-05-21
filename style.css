@@ -319,6 +319,24 @@ html, body {
 .bmeta { font-size: 10px; color: rgba(255,255,255,0.6); margin-top: 3px; }
 .mine .bmeta { color: #888; }
 
+/* 공지 메시지 스타일 */
+.bubble.notice {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: var(--text3) !important;
+  text-align: center !important;
+  font-size: 12px !important;
+  padding: 8px 16px !important;
+  border-radius: 20px !important;
+  margin: 12px auto !important;
+  width: fit-content !important;
+  max-width: 85% !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .bubble.notice {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
 /* ============================================================
    말풍선 컨텍스트 메뉴
    ============================================================ */
