@@ -480,36 +480,76 @@ async function renderChats() {
 
   const container = document.getElementById('chats-list-container');
   if (!container) { isRenderingChats = false; return; }
-  const sorted = [...chatRoomsList].sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
+
+  // 1. 모든 채팅방의 마지막 메시지 시간 조회
+  const roomIds = chatRoomsList.map(r => r.id);
+  const { data: allLastMsgs } = await supabaseClient
+    .from('messages')
+    .select('room_id, created_at')
+    .in('room_id', roomIds)
+    .order('created_at', { ascending: false });
+
+  // 2. 마지막 메시지 시간 맵 만들기
+  const lastTimeMap = {};
+  for (const msg of allLastMsgs || []) {
+    if (!lastTimeMap[msg.room_id]) {
+      lastTimeMap[msg.room_id] = msg.created_at;
+    }
+  }
+
+  // 3. 정렬: 고정된 방 우선, 그 다음 최신순
+  const sorted = [...chatRoomsList].sort((a, b) => {
+    // 고정된 방 먼저
+    if (a.is_pinned && !b.is_pinned) return -1;
+    if (!a.is_pinned && b.is_pinned) return 1;
+    
+    // 둘 다 고정이거나 둘 다 일반이면 최신순
+    const timeA = lastTimeMap[a.id] || a.created_at || 0;
+    const timeB = lastTimeMap[b.id] || b.created_at || 0;
+    return new Date(timeB) - new Date(timeA);
+  });
+
   const filtered = sorted.filter(c => c.name?.toLowerCase().includes(chatSearchQuery.toLowerCase()));
+  
   if (filtered.length === 0) {
     container.innerHTML = `<div class="empty-state"><p>채팅방이 없습니다.</p></div>`;
     isRenderingChats = false;
     return;
   }
-  const roomIds = filtered.map(r => r.id);
-  const { data: allLastMsgs } = await supabaseClient
+
+  // 4. 필터링된 방들의 마지막 메시지 내용 조회
+  const filteredRoomIds = filtered.map(r => r.id);
+  const { data: lastMsgs } = await supabaseClient
     .from('messages')
     .select('room_id, content, type, created_at')
-    .in('room_id', roomIds)
+    .in('room_id', filteredRoomIds)
     .order('created_at', { ascending: false });
+
   const lastMsgMap = {};
-  for (const msg of allLastMsgs || []) {
+  for (const msg of lastMsgs || []) {
     if (!lastMsgMap[msg.room_id]) lastMsgMap[msg.room_id] = msg;
   }
+
   container.innerHTML = '';
+  
   for (const room of filtered) {
     const lastChat = lastMsgMap[room.id];
-    if (!lastChat) continue;
-    let displayMsg = lastChat.type === 'image' ? '📸 사진' : (lastChat.content?.substring(0, 30) || '');
+    let displayMsg = '대화 내역 없음';
     let displayTime = '';
-    if (lastChat.created_at) {
-      const d = new Date(lastChat.created_at);
-      const h = d.getHours(); const m = String(d.getMinutes()).padStart(2, '0');
-      displayTime = `${h >= 12 ? '오후' : '오전'} ${h % 12 || 12}:${m}`;
+    
+    if (lastChat) {
+      displayMsg = lastChat.type === 'image' ? '📸 사진' : (lastChat.content?.substring(0, 30) || '');
+      if (lastChat.created_at) {
+        const d = new Date(lastChat.created_at);
+        const h = d.getHours();
+        const m = String(d.getMinutes()).padStart(2, '0');
+        displayTime = `${h >= 12 ? '오후' : '오전'} ${h % 12 || 12}:${m}`;
+      }
     }
+    
     const isPinned = room.is_pinned || false;
     let avatarHtml = '';
+    
     if (!room.is_group) {
       const otherId = room.members?.find(id => id !== currentUserId);
       const other = friendsList.find(f => f.id === otherId);
@@ -521,6 +561,7 @@ async function renderChats() {
     } else {
       avatarHtml = `<div class="chat-avatar avatar-base"><i class="ti ti-users"></i></div>`;
     }
+    
     const wrapper = document.createElement('div');
     wrapper.className = 'chat-item-wrapper';
     wrapper.setAttribute('data-id', room.id);
@@ -566,37 +607,53 @@ async function chatSwipeAction(action, roomId) {
   } else if (action === 'leave') {
     if (!confirm("채팅방에서 나가시겠습니까? 나가면 대화 내용이 삭제됩니다.")) return;
     
-    // 1. 모든 메시지에 내 ID를 deleted_for_me 배열에 추가 (내 화면에서 숨김)
-    const { data: messages } = await supabaseClient
-      .from('messages')
-      .select('id, deleted_for_me')
-      .eq('room_id', roomId);
+    const isSecret = room.is_secret || false;
     
-    for (const msg of messages) {
-      const currentDeleted = msg.deleted_for_me || [];
-      if (!currentDeleted.includes(currentUserId)) {
-        await supabaseClient
-          .from('messages')
-          .update({ deleted_for_me: [...currentDeleted, currentUserId] })
-          .eq('id', msg.id);
-      }
-    }
-    
-    // 2. 채팅방 멤버에서 제거
-    await supabaseClient.from('chat_room_members').delete().eq('room_id', roomId).eq('user_id', currentUserId);
-    
-    // 3. 방에 아무도 없으면 방 자체도 삭제
-    const { count } = await supabaseClient
-      .from('chat_room_members')
-      .select('*', { count: 'exact', head: true })
-      .eq('room_id', roomId);
-    
-    if (count === 0) {
+    if (isSecret) {
+      // 🔒 비밀 채팅방: 모든 메시지 deleted_for_all = true (모두에게 영구 삭제)
+      await supabaseClient
+        .from('messages')
+        .update({ deleted_for_all: true })
+        .eq('room_id', roomId);
+      
+      // 방 삭제
       await supabaseClient.from('chat_rooms').delete().eq('id', roomId);
+      
+      showToast("채팅방", "비밀 채팅방이 삭제되었습니다.", "#ff4757");
+    } else {
+      // 일반 채팅방: 내 화면에서만 메시지 숨김 (deleted_for_me)
+      const { data: messages } = await supabaseClient
+        .from('messages')
+        .select('id, deleted_for_me')
+        .eq('room_id', roomId);
+      
+      for (const msg of messages || []) {
+        const currentDeleted = msg.deleted_for_me || [];
+        if (!currentDeleted.includes(currentUserId)) {
+          await supabaseClient
+            .from('messages')
+            .update({ deleted_for_me: [...currentDeleted, currentUserId] })
+            .eq('id', msg.id);
+        }
+      }
+      
+      // 채팅방 멤버에서 제거
+      await supabaseClient.from('chat_room_members').delete().eq('room_id', roomId).eq('user_id', currentUserId);
+      
+      // 방에 아무도 없으면 방 자체도 삭제
+      const { count } = await supabaseClient
+        .from('chat_room_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('room_id', roomId);
+      
+      if (count === 0) {
+        await supabaseClient.from('chat_rooms').delete().eq('id', roomId);
+      }
+      
+      showToast("채팅방", "채팅방에서 나갔습니다. 대화 내용이 삭제되었습니다.", "#ff4757");
     }
     
     chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
-    showToast("채팅방", "채팅방에서 나갔습니다. 대화 내용이 삭제되었습니다.", "#ff4757");
     renderChats();
   }
 }
@@ -605,83 +662,73 @@ async function chatSwipeAction(action, roomId) {
    채팅방 열기
    ============================================================ */
 async function openRoomWithFriend(friendId) {
-  // 1. 이미 존재하는 1:1 채팅방 찾기 (더 정확하게)
-  let room = chatRoomsList.find(r => 
-    !r.is_group && 
-    r.members?.includes(friendId) && 
-    r.members?.includes(currentUserId)
-  );
+  // 1. DB에서 직접 공통 채팅방 찾기 (가장 정확함)
+  const { data: myRooms } = await supabaseClient
+    .from('chat_room_members')
+    .select('room_id')
+    .eq('user_id', currentUserId);
+
+  const myRoomIds = myRooms?.map(r => r.room_id) || [];
   
-  // 2. chatRoomsList에 없으면 DB에서 직접 확인
-  if (!room) {
-    const { data: existingRooms } = await supabaseClient
+  if (myRoomIds.length > 0) {
+    const { data: sharedRooms } = await supabaseClient
       .from('chat_room_members')
       .select('room_id')
-      .eq('user_id', currentUserId);
+      .eq('user_id', friendId)
+      .in('room_id', myRoomIds);
     
-    const myRoomIds = existingRooms?.map(r => r.room_id) || [];
-    
-    if (myRoomIds.length > 0) {
-      const { data: sharedRooms } = await supabaseClient
-        .from('chat_room_members')
-        .select('room_id')
-        .eq('user_id', friendId)
-        .in('room_id', myRoomIds);
+    if (sharedRooms && sharedRooms.length > 0) {
+      // 기존 방이 있다면 그 방을 사용
+      const { data: roomData } = await supabaseClient
+        .from('chat_rooms')
+        .select('*')
+        .eq('id', sharedRooms[0].room_id)
+        .single();
       
-      if (sharedRooms && sharedRooms.length > 0) {
-        // 기존 방이 있다면 그 방을 사용
-        const { data: roomData } = await supabaseClient
-          .from('chat_rooms')
-          .select('*')
-          .eq('id', sharedRooms[0].room_id)
-          .eq('is_group', false)
-          .single();
+      if (roomData) {
+        // 멤버 정보 추가
+        const { data: members } = await supabaseClient
+          .from('chat_room_members')
+          .select('user_id')
+          .eq('room_id', roomData.id);
+        roomData.members = members?.map(m => m.user_id) || [];
         
-        if (roomData) {
-          // 멤버 정보 추가
-          const { data: members } = await supabaseClient
-            .from('chat_room_members')
-            .select('user_id')
-            .eq('room_id', roomData.id);
-          roomData.members = members?.map(m => m.user_id) || [];
-          
+        // 이미 목록에 없으면 추가
+        if (!chatRoomsList.find(r => r.id === roomData.id)) {
           chatRoomsList.push(roomData);
-          room = roomData;
         }
+        openRoomFromData(roomData.id);
+        return;
       }
     }
   }
   
-  // 3. 정말 없으면 새로 생성
-  if (!room) {
-    const friend = friendsList.find(f => f.id === friendId);
-    if (!friend) { 
-      showToast("오류","친구 정보를 찾을 수 없습니다.","#ff4757"); 
-      return; 
-    }
-    
-    const { data: newRoom, error } = await supabaseClient
-      .from('chat_rooms')
-      .insert({ name: friend.name, is_group: false, created_by: currentUserId })
-      .select()
-      .single();
-    
-    if (error) { 
-      showToast("오류","채팅방을 만들 수 없습니다.","#ff4757"); 
-      return; 
-    }
-    
-    await supabaseClient.from('chat_room_members').insert([
-      { room_id: newRoom.id, user_id: currentUserId },
-      { room_id: newRoom.id, user_id: friendId }
-    ]);
-    
-    newRoom.members = [currentUserId, friendId];
-    chatRoomsList.push(newRoom);
-    room = newRoom;
+  // 2. 정말 없으면 새로 생성
+  const friend = friendsList.find(f => f.id === friendId);
+  if (!friend) { 
+    showToast("오류","친구 정보를 찾을 수 없습니다.","#ff4757"); 
+    return; 
   }
   
-  openRoomFromData(room.id);
+  const { data: newRoom, error } = await supabaseClient
+    .from('chat_rooms')
+    .insert({ name: friend.name, is_group: false, created_by: currentUserId })
+    .select()
+    .single();
+  
+  if (error) { 
+    showToast("오류","채팅방을 만들 수 없습니다.","#ff4757"); 
+    return; 
+  }
+  
+  await supabaseClient.from('chat_room_members').insert([
+    { room_id: newRoom.id, user_id: currentUserId },
+    { room_id: newRoom.id, user_id: friendId }
+  ]);
+  
+  newRoom.members = [currentUserId, friendId];
+  chatRoomsList.push(newRoom);
+  openRoomFromData(newRoom.id);
 }
 
 async function openRoomFromData(roomId) {
@@ -841,6 +888,25 @@ function appendMessageToUI(msg) {
 
 function makeBubbleEl(msg, isMine) {
   const bubble = document.createElement('div');
+  
+  // ✅ 공지사항 타입 처리 (비밀 채팅방 안내 등)
+  if (msg.type === 'notice') {
+    bubble.className = 'bubble notice';
+    bubble.textContent = msg.content;
+    bubble.style.background = 'rgba(0,0,0,0.08)';
+    bubble.style.color = 'var(--text3)';
+    bubble.style.textAlign = 'center';
+    bubble.style.fontSize = '12px';
+    bubble.style.padding = '8px 16px';
+    bubble.style.borderRadius = '20px';
+    bubble.style.margin = '8px auto';
+    bubble.style.width = 'fit-content';
+    bubble.style.maxWidth = '85%';
+    bubble.onclick = null;
+    return bubble;
+  }
+  
+  // 일반 메시지
   bubble.className = `bubble ${isMine ? 'mine' : 'other'}`;
   
   if (msg.type === 'image' && msg.image_url) {
@@ -1387,15 +1453,44 @@ function closeGroupCreateModal() { document.getElementById('group-create-modal')
 async function confirmCreateGroupChat() {
   const name = document.getElementById('group-name-input')?.value.trim();
   if (!name) { alert("채팅방 이름을 입력하세요."); return; }
+  
   const checked = [...document.querySelectorAll('#group-member-list input[type=checkbox]:checked')].map(c => c.value);
   if (checked.length === 0) { alert("초대할 친구를 선택하세요."); return; }
-  const { data: room } = await supabaseClient.from('chat_rooms').insert({ name, is_group: true, created_by: currentUserId }).select().single();
-  if (!room) return;
+  
+  // ✅ 비밀 채팅방 여부 확인
+  const isSecret = document.getElementById('secret-room-checkbox')?.checked || false;
+  
+  const { data: room, error } = await supabaseClient
+    .from('chat_rooms')
+    .insert({ 
+      name, 
+      is_group: true, 
+      created_by: currentUserId,
+      is_secret: isSecret  // ✅ 추가
+    })
+    .select()
+    .single();
+  
+  if (error || !room) { alert("채팅방 생성에 실패했습니다."); return; }
+  
   const members = [currentUserId, ...checked].map(uid => ({ room_id: room.id, user_id: uid }));
   await supabaseClient.from('chat_room_members').insert(members);
+  
+  room.members = [currentUserId, ...checked];
   chatRoomsList.push(room);
   renderChats();
   closeGroupCreateModal();
+  
+  // ✅ 비밀 채팅방 안내 메시지 전송
+  if (isSecret) {
+    await supabaseClient.from('messages').insert({
+      room_id: room.id,
+      sender_id: currentUserId,
+      content: '🔒 이 방은 비밀 채팅방입니다. 한 명이라도 나가면 모든 내용이 삭제됩니다.',
+      type: 'notice'
+    });
+  }
+  
   showToast("단체채팅", `'${name}' 방이 만들어졌습니다.`, "#5352ed");
 }
 
