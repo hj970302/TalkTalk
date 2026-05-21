@@ -234,32 +234,39 @@
     </div>
   </div>
 
-  <!-- 친구 탭 -->
-  <div class="screen active" id="screen-friends">
-    <div class="top-bar">
-      <h1>친구</h1>
-      <div class="top-icons">
-        <i class="ti ti-search" onclick="toggleSearchBar()"></i>
-        <i class="ti ti-settings" onclick="openManageModal()"></i>
-      </div>
-    </div>
-    <div class="search-bar-container" id="friend-search-container">
-      <div class="search-input-wrapper">
-        <input type="text" id="friend-search-input" placeholder="이름 검색" oninput="filterFriends()">
-        <i class="ti ti-x" onclick="clearSearch()"></i>
-      </div>
-    </div>
-    <div class="scroll-area">
-      <div class="my-profile" onclick="openProfileCard('me')">
-        <div class="avatar-lg avatar-base" id="my-avatar-display"><i class="ti ti-user"></i></div>
-        <div>
-          <div class="pname" id="my-name-display">나</div>
-          <div class="pstatus" id="my-status-display">상태메시지</div>
-        </div>
-      </div>
-      <div id="friends-list-container"></div>
+ <!-- 친구 탭 -->
+<div class="screen active" id="screen-friends">
+  <div class="top-bar">
+    <h1>친구</h1>
+    <div class="top-icons">
+      <i class="ti ti-search" onclick="toggleSearchBar()"></i>
+      <i class="ti ti-settings" onclick="openManageModal()"></i>
     </div>
   </div>
+  <div class="search-bar-container" id="friend-search-container">
+    <div class="search-input-wrapper">
+      <input type="text" id="friend-search-input" placeholder="이름 검색" oninput="filterFriends()">
+      <i class="ti ti-x" onclick="clearSearch()"></i>
+    </div>
+  </div>
+  <div class="scroll-area">
+    <div class="my-profile" onclick="openProfileCard('me')">
+      <div class="avatar-lg avatar-base" id="my-avatar-display"><i class="ti ti-user"></i></div>
+      <div>
+        <div class="pname" id="my-name-display">나</div>
+        <div class="pstatus" id="my-status-display">상태메시지</div>
+      </div>
+    </div>
+    
+    <!-- 👇 받은 친구 요청 섹션 (여기에 추가) -->
+    <div id="friend-requests-container" style="display: none;">
+      <div class="section-title">📨 받은 친구 요청</div>
+      <div id="friend-requests-list"></div>
+    </div>
+    
+    <div id="friends-list-container"></div>
+  </div>
+</div>
 
   <!-- 채팅 탭 -->
   <div class="screen" id="screen-chats">
