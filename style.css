@@ -401,7 +401,7 @@ html, body {
 .swipe-action-menu { display: none !important; }
 
 /* ============================================================
-   포켓몬 테마 (개인용)
+   포켓몬 테마 (개인용) - 깔끔 버전
    ============================================================ */
 [data-theme="pokemon"] {
   --bg: #fff9e8;
@@ -427,27 +427,13 @@ html, body {
 /* 헤더 배경 */
 [data-theme="pokemon"] .top-bar {
   background: #ffde6e !important;
-  position: relative;
-  overflow: hidden;
 }
 
-/* 헤더 아이콘 색상 */
+/* 헤더 아이콘 (기존 아이콘 그대로, 색상만 변경) */
 [data-theme="pokemon"] .top-icons i,
 [data-theme="pokemon"] .back-btn,
 [data-theme="pokemon"] .room-icons i {
   color: #5a3e1b !important;
-}
-
-/* 피카츄 장식 (헤더 오른쪽) */
-[data-theme="pokemon"] .top-bar::after {
-  content: "⚡";
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 22px;
-  opacity: 0.6;
-  pointer-events: none;
 }
 
 /* 채팅방 배경 */
@@ -455,7 +441,7 @@ html, body {
   background: linear-gradient(180deg, #a8d8ea 0%, #c8e8f5 100%) !important;
 }
 
-/* 내 말풍선 (피카츄 스타일) */
+/* 내 말풍선 */
 [data-theme="pokemon"] .bubble.mine {
   background: #ffde6e !important;
   color: #5a3e1b !important;
@@ -476,52 +462,19 @@ html, body {
   color: #5a3e1b !important;
 }
 
-/* 채팅방 상단 아이콘 (⚡) */
-[data-theme="pokemon"] .room-title::before {
-  content: "⚡";
-  margin-right: 6px;
-  font-size: 14px;
-}
-
-[data-theme="pokemon"] .room-title::after {
-  content: "⚡";
-  margin-left: 6px;
-  font-size: 14px;
-}
-
 /* 더보기 헤더 */
 [data-theme="pokemon"] .more-hero {
   background: #ffde6e !important;
-  position: relative;
-  overflow: hidden;
 }
 
-/* 더보기 헤더 장식 */
-[data-theme="pokemon"] .more-hero::before {
-  content: "🌿";
-  position: absolute;
-  left: 12px;
-  bottom: 8px;
-  font-size: 24px;
-  opacity: 0.4;
-}
-
-[data-theme="pokemon"] .more-hero::after {
-  content: "🔥";
-  position: absolute;
-  right: 12px;
-  top: 8px;
-  font-size: 22px;
-  opacity: 0.4;
-}
-
-/* 탭바 (활성화된 탭) */
+/* 탭바 활성화 */
 [data-theme="pokemon"] .tab-btn.active {
   color: #ff6b9d !important;
 }
 
-[data-theme="pokemon"] .tab-btn.active i {
-  text-shadow: 0 0 3px #ffde6e;
+/* 탭바 일반 아이콘 */
+[data-theme="pokemon"] .tab-btn i {
+  color: inherit !important;
 }
 
 /* 로딩 스피너 */
