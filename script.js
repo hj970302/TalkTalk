@@ -1069,16 +1069,23 @@ async function sendPushNotification(text) {
     const playerIds = profiles?.map(p => p.onesignal_player_id).filter(Boolean) || [];
     if (playerIds.length === 0) return;
 
-    await fetch('https://yrndqghsdtxoajgxvqrv.supabase.co/functions/v1/send-notification', {
+    const response = await fetch('https://onesignal.com/api/v1/notifications', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Basic fa3e79db-55b2-4d23-b315-c0f131287f7e'
+      },
       body: JSON.stringify({
-        player_ids: playerIds,
-        title: currentUserProfile?.name || '톡톡',
-        message: text,
-        url: 'https://talk-talk-phi.vercel.app'
+        app_id: 'fa3e79db-55b2-4d23-b315-c0f131287f7e',
+        include_player_ids: playerIds,
+        headings: { en: currentUserProfile?.name || '톡톡' },
+        contents: { en: text.length > 50 ? text.substring(0, 50) + '...' : text },
+        data: { roomId: currentRoom.id, type: 'new_message' }
       })
     });
+
+    const result = await response.json();
+    console.log('알림 전송 결과:', result);
   } catch(e) {
     console.error('알림 전송 실패:', e);
   }
