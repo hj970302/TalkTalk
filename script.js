@@ -28,6 +28,10 @@ let flipY = 1;
 let textEditMode = 'name';
 let selectedMessageId = null;
 let viewerContextMessageId = null;
+let isLoadingMore = false;
+let hasMoreMessages = false;
+let oldestMessageId = null;
+let lastRenderChatsData = {};
 
 /* ============================================================
    폰트 / 테마 설정
@@ -553,74 +557,74 @@ async function renderChats() {
   const container = document.getElementById('chats-list-container');
   if (!container) { isRenderingChats = false; return; }
 
-  // 1. 모든 채팅방의 마지막 메시지 시간 조회
   const roomIds = chatRoomsList.map(r => r.id);
-  const { data: allLastMsgs } = await supabaseClient
+  if (roomIds.length === 0) {
+    container.innerHTML = `<div class="empty-state"><p>채팅방이 없습니다.</p></div>`;
+    isRenderingChats = false;
+    return;
+  }
+
+  // 마지막 메시지 + 읽지 않은 수 한번에 조회
+  const { data: allMsgs } = await supabaseClient
     .from('messages')
-    .select('room_id, created_at')
+    .select('room_id, content, type, created_at, read_by, sender_id')
     .in('room_id', roomIds)
     .order('created_at', { ascending: false });
 
-  // 2. 마지막 메시지 시간 맵 만들기
-  const lastTimeMap = {};
-  for (const msg of allLastMsgs || []) {
-    if (!lastTimeMap[msg.room_id]) {
-      lastTimeMap[msg.room_id] = msg.created_at;
-    }
-  }
-
-  // 3. 안 읽은 메시지 개수 조회
-  const { data: unreadData } = await supabaseClient
-    .from('messages')
-    .select('room_id, read_by')
-    .in('room_id', roomIds)
-    .neq('sender_id', currentUserId);
-
+  const lastMsgMap = {};
   const unreadCountMap = {};
-  for (const msg of unreadData || []) {
-    const readBy = msg.read_by || [];
-    if (!readBy.includes(currentUserId)) {
-      unreadCountMap[msg.room_id] = (unreadCountMap[msg.room_id] || 0) + 1;
+
+  for (const msg of allMsgs || []) {
+    if (!lastMsgMap[msg.room_id]) lastMsgMap[msg.room_id] = msg;
+    if (msg.sender_id !== currentUserId) {
+      const readBy = msg.read_by || [];
+      if (!readBy.includes(currentUserId)) {
+        unreadCountMap[msg.room_id] = (unreadCountMap[msg.room_id] || 0) + 1;
+      }
     }
   }
 
-  // 4. 정렬
   const sorted = [...chatRoomsList].sort((a, b) => {
     if (a.is_pinned && !b.is_pinned) return -1;
     if (!a.is_pinned && b.is_pinned) return 1;
-    const timeA = lastTimeMap[a.id] || a.created_at || 0;
-    const timeB = lastTimeMap[b.id] || b.created_at || 0;
+    const timeA = lastMsgMap[a.id]?.created_at || a.created_at || 0;
+    const timeB = lastMsgMap[b.id]?.created_at || b.created_at || 0;
     return new Date(timeB) - new Date(timeA);
   });
 
   const filtered = sorted.filter(c => c.name?.toLowerCase().includes(chatSearchQuery.toLowerCase()));
-  
+
   if (filtered.length === 0) {
     container.innerHTML = `<div class="empty-state"><p>채팅방이 없습니다.</p></div>`;
     isRenderingChats = false;
     return;
   }
 
-  // 5. 마지막 메시지 내용 조회
-  const filteredRoomIds = filtered.map(r => r.id);
-  const { data: lastMsgs } = await supabaseClient
-    .from('messages')
-    .select('room_id, content, type, created_at')
-    .in('room_id', filteredRoomIds)
-    .order('created_at', { ascending: false });
-
-  const lastMsgMap = {};
-  for (const msg of lastMsgs || []) {
-    if (!lastMsgMap[msg.room_id]) lastMsgMap[msg.room_id] = msg;
+  // ✅ 변경된 방만 업데이트
+  const newKeys = {};
+  for (const room of filtered) {
+    const last = lastMsgMap[room.id];
+    newKeys[room.id] = `${last?.created_at || ''}|${unreadCountMap[room.id] || 0}|${room.is_pinned}`;
   }
 
+  let needsFullRender = filtered.length !== container.querySelectorAll('.chat-item-wrapper').length;
+
+  if (!needsFullRender) {
+    let changed = false;
+    for (const room of filtered) {
+      if (newKeys[room.id] !== lastRenderChatsData[room.id]) { changed = true; break; }
+    }
+    if (!changed) { isRenderingChats = false; return; }
+  }
+
+  lastRenderChatsData = newKeys;
   container.innerHTML = '';
-  
+
   for (const room of filtered) {
     const lastChat = lastMsgMap[room.id];
     let displayMsg = '대화 내역 없음';
     let displayTime = '';
-    
+
     if (lastChat) {
       displayMsg = lastChat.type === 'image' ? '📸 사진' : (lastChat.content?.substring(0, 30) || '');
       if (lastChat.created_at) {
@@ -630,24 +634,18 @@ async function renderChats() {
         displayTime = `${h >= 12 ? '오후' : '오전'} ${h % 12 || 12}:${m}`;
       }
     }
-    
+
     const isPinned = room.is_pinned || false;
     const unreadCount = unreadCountMap[room.id] || 0;
     let avatarHtml = '';
-    
-    // ✅ 1:1 채팅방 이름 표시 (상대방 이름으로)
     let displayName = room.name || (room.is_group ? '단체방' : '대화');
-    
+
     if (!room.is_group && room.members) {
       const otherId = room.members.find(id => id !== currentUserId);
-      if (otherId) {
-        const otherUser = friendsList.find(f => f.id === otherId);
-        if (otherUser) {
-          displayName = otherUser.name;
-        }
-      }
+      const otherUser = friendsList.find(f => f.id === otherId);
+      if (otherUser) displayName = otherUser.name;
     }
-    
+
     if (!room.is_group) {
       const otherId = room.members?.find(id => id !== currentUserId);
       const other = friendsList.find(f => f.id === otherId);
@@ -659,7 +657,7 @@ async function renderChats() {
     } else {
       avatarHtml = `<div class="chat-avatar avatar-base"><i class="ti ti-users"></i></div>`;
     }
-    
+
     const wrapper = document.createElement('div');
     wrapper.className = 'chat-item-wrapper';
     wrapper.setAttribute('data-id', room.id);
@@ -689,6 +687,7 @@ async function renderChats() {
     container.appendChild(wrapper);
     attachSwipeToItem(wrapper);
   }
+
   isRenderingChats = false;
 }
 
@@ -925,42 +924,104 @@ async function loadMessages(roomId) {
   const container = document.getElementById('room-messages');
   if (!container) return;
   
-  // 로딩 표시
-  container.innerHTML = '<div class="loading-spinner"></div><div style="text-align:center; padding:20px;">메시지 불러오는 중...</div>';
-  
-  // 1. 메시지만 먼저 가져오기
+  container.innerHTML = '<div style="text-align:center; padding:20px; color:#aaa;">메시지 불러오는 중...</div>';
+  oldestMessageId = null;
+  hasMoreMessages = false;
+
   const { data: messages } = await supabaseClient
     .from('messages')
     .select('*')
     .eq('room_id', roomId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  const sorted = (messages || []).reverse();
   
-  // 2. 방 멤버 정보 (친구 목록에서 재사용)
+  if ((messages || []).length === 50) {
+    hasMoreMessages = true;
+    oldestMessageId = sorted[0]?.created_at;
+  }
+
   const memberIds = currentRoom.members || [];
-  
-  // 3. 프로필 정보 (친구 목록 + 본인)
   const memberProfiles = memberIds.map(id => {
     if (id === currentUserId) return currentUserProfile;
     return friendsList.find(f => f.id === id);
   }).filter(Boolean);
-  
   window._roomMemberProfiles = memberProfiles;
-  
-  // 4. 메시지 렌더링
-  container.innerHTML = `<div class="date-sep"><span>${dateStr()}</span></div>`;
-  
-  for (const msg of messages || []) {
+
+  container.innerHTML = '';
+
+  // 더 불러오기 버튼
+  if (hasMoreMessages) {
+    const loadMoreBtn = document.createElement('div');
+    loadMoreBtn.id = 'load-more-btn';
+    loadMoreBtn.style.cssText = 'text-align:center; padding:12px; cursor:pointer; color:#888; font-size:13px;';
+    loadMoreBtn.textContent = '⬆ 이전 메시지 불러오기';
+    loadMoreBtn.onclick = () => loadMoreMessages(roomId);
+    container.appendChild(loadMoreBtn);
+  }
+
+  container.appendChild((() => {
+    const d = document.createElement('div');
+    d.className = 'date-sep';
+    d.innerHTML = `<span>${dateStr()}</span>`;
+    return d;
+  })());
+
+  for (const msg of sorted) {
     if (msg.deleted_for_all) continue;
     if (blockedList.includes(msg.sender_id)) continue;
-    
-    // ✅ 내가 나가서 삭제한 메시지는 안 보이게 필터링
-    const deletedForMe = msg.deleted_for_me || [];
-    if (deletedForMe.includes(currentUserId)) continue;
-    
+    if ((msg.deleted_for_me || []).includes(currentUserId)) continue;
     appendMessageToUI(msg);
   }
-  
+
   container.scrollTop = container.scrollHeight;
+}
+
+async function loadMoreMessages(roomId) {
+  if (isLoadingMore || !oldestMessageId) return;
+  isLoadingMore = true;
+
+  const btn = document.getElementById('load-more-btn');
+  if (btn) btn.textContent = '불러오는 중...';
+
+  const { data: messages } = await supabaseClient
+    .from('messages')
+    .select('*')
+    .eq('room_id', roomId)
+    .lt('created_at', oldestMessageId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  const sorted = (messages || []).reverse();
+
+  if (sorted.length < 50) {
+    if (btn) btn.remove();
+    hasMoreMessages = false;
+  } else {
+    oldestMessageId = sorted[0]?.created_at;
+    if (btn) btn.textContent = '⬆ 이전 메시지 불러오기';
+  }
+
+  const container = document.getElementById('room-messages');
+  const firstMsg = container.querySelector('[data-msg-id]');
+
+  for (const msg of sorted) {
+    if (msg.deleted_for_all) continue;
+    if (blockedList.includes(msg.sender_id)) continue;
+    if ((msg.deleted_for_me || []).includes(currentUserId)) continue;
+
+    const row = document.createElement('div');
+    row.setAttribute('data-msg-id', msg.id);
+    const tempContainer = document.getElementById('room-messages');
+    appendMessageToUI(msg);
+    const newRow = tempContainer.lastChild;
+    if (newRow && firstMsg) {
+      container.insertBefore(newRow, firstMsg);
+    }
+  }
+
+  isLoadingMore = false;
 }
 
 function appendMessageToUI(msg) {
