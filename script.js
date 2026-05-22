@@ -920,64 +920,6 @@ async function openRoomFromData(roomId) {
   await markMessagesAsRead(room.id);
 }
 
-async function loadMessages(roomId) {
-  const container = document.getElementById('room-messages');
-  if (!container) return;
-  
-  container.innerHTML = '<div style="text-align:center; padding:20px; color:#aaa;">메시지 불러오는 중...</div>';
-  oldestMessageId = null;
-  hasMoreMessages = false;
-
-  const { data: messages } = await supabaseClient
-    .from('messages')
-    .select('*')
-    .eq('room_id', roomId)
-    .order('created_at', { ascending: false })
-    .limit(50);
-
-  const sorted = (messages || []).reverse();
-  
-  if ((messages || []).length === 50) {
-    hasMoreMessages = true;
-    oldestMessageId = sorted[0]?.created_at;
-  }
-
-  const memberIds = currentRoom.members || [];
-  const memberProfiles = memberIds.map(id => {
-    if (id === currentUserId) return currentUserProfile;
-    return friendsList.find(f => f.id === id);
-  }).filter(Boolean);
-  window._roomMemberProfiles = memberProfiles;
-
-  container.innerHTML = '';
-
-  // 더 불러오기 버튼
-  if (hasMoreMessages) {
-    const loadMoreBtn = document.createElement('div');
-    loadMoreBtn.id = 'load-more-btn';
-    loadMoreBtn.style.cssText = 'text-align:center; padding:12px; cursor:pointer; color:#888; font-size:13px;';
-    loadMoreBtn.textContent = '⬆ 이전 메시지 불러오기';
-    loadMoreBtn.onclick = () => loadMoreMessages(roomId);
-    container.appendChild(loadMoreBtn);
-  }
-
-  container.appendChild((() => {
-    const d = document.createElement('div');
-    d.className = 'date-sep';
-    d.innerHTML = `<span>${dateStr()}</span>`;
-    return d;
-  })());
-
-  for (const msg of sorted) {
-    if (msg.deleted_for_all) continue;
-    if (blockedList.includes(msg.sender_id)) continue;
-    if ((msg.deleted_for_me || []).includes(currentUserId)) continue;
-    appendMessageToUI(msg);
-  }
-
-  container.scrollTop = container.scrollHeight;
-}
-
 async function loadMoreMessages(roomId) {
   if (isLoadingMore || !oldestMessageId) return;
   isLoadingMore = true;
@@ -1004,23 +946,34 @@ async function loadMoreMessages(roomId) {
   }
 
   const container = document.getElementById('room-messages');
-  const firstMsg = container.querySelector('[data-msg-id]');
+  const scrollBottom = container.scrollHeight - container.scrollTop;
+
+  // 버튼 바로 다음 위치에 삽입
+  const insertAfter = btn ? btn.nextSibling : container.firstChild;
 
   for (const msg of sorted) {
     if (msg.deleted_for_all) continue;
     if (blockedList.includes(msg.sender_id)) continue;
     if ((msg.deleted_for_me || []).includes(currentUserId)) continue;
 
+    const isMine = msg.sender_id === currentUserId;
     const row = document.createElement('div');
-    row.setAttribute('data-msg-id', msg.id);
-    const tempContainer = document.getElementById('room-messages');
-    appendMessageToUI(msg);
-    const newRow = tempContainer.lastChild;
-    if (newRow && firstMsg) {
-      container.insertBefore(newRow, firstMsg);
-    }
+    row.className = `msg-row ${isMine ? 'mine' : 'other'}`;
+    if (msg.id) row.setAttribute('data-msg-id', msg.id);
+
+    const bwrap = document.createElement('div');
+    bwrap.className = 'bwrap';
+    const bubble = makeBubbleEl(msg, isMine);
+    const meta = makeMetaEl();
+    bwrap.appendChild(bubble);
+    bwrap.appendChild(meta);
+    row.appendChild(bwrap);
+
+    container.insertBefore(row, insertAfter);
   }
 
+  // 스크롤 위치 유지
+  container.scrollTop = container.scrollHeight - scrollBottom;
   isLoadingMore = false;
 }
 
