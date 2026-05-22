@@ -819,35 +819,25 @@ async function chatSwipeAction(action, roomId) {
   } else if (action === 'leave') {
     if (!confirm("채팅방에서 나가시겠습니까? 나가면 대화 내용이 삭제됩니다.")) return;
     
-    // ✅ 1. DB에서 채팅방 멤버 삭제 (이게 핵심!)
-    await supabaseClient
-      .from('chat_room_members')
-      .delete()
-      .eq('room_id', roomId)
-      .eq('user_id', currentUserId);
+    // ✅ 멤버 삭제하지 않음! (채팅방 재입장을 위해 DB 멤버는 유지)
     
-    // ✅ 2. 방에 아무도 없으면 방 자체도 삭제
-    const { count } = await supabaseClient
-      .from('chat_room_members')
-      .select('*', { count: 'exact', head: true })
+    // 1. 모든 메시지에 내 ID를 deleted_for_me 배열에 추가 (병렬 처리로 속도 개선)
+    const { data: messages } = await supabaseClient
+      .from('messages')
+      .select('id, deleted_for_me')
       .eq('room_id', roomId);
     
-    if (count === 0) {
-      await supabaseClient.from('chat_rooms').delete().eq('id', roomId);
-    }
-    
-    // ✅ 3. UI에서 제거
-    chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
-    
-    // ✅ 4. 현재 채팅방 열려있으면 닫기
-    if (roomOpen && currentRoom.id === roomId) {
-      closeRoom();
-    }
-    
-    renderChats();
-    showToast("채팅방", "채팅방에서 나갔습니다.", "#ff4757");
-  }
-}
+    // ✅ 병렬로 모든 업데이트 실행
+    const updatePromises = (messages || []).map(async (msg) => {
+      const currentDeleted = msg.deleted_for_me || [];
+      if (!currentDeleted.includes(currentUserId)) {
+        return supabaseClient
+          .from('messages')
+          .update({ deleted_for_me: [...currentDeleted, currentUserId] })
+          .eq('id', msg.id);
+      }
+      return null;
+    });
     
     await Promise.all(updatePromises.filter(Boolean));
     
@@ -1040,168 +1030,50 @@ async function openRoomFromData(roomId) {
     })
     .subscribe();
 
-  // ✅ 메시지 로드 (50개)
   await loadMessages(room.id);
   await markMessagesAsRead(room.id);
-  
-  // ✅ 스크롤 이벤트 리스너 추가 (더 불러오기)
-  const messagesContainer = document.getElementById('room-messages');
-  if (messagesContainer) {
-    messagesContainer.removeEventListener('scroll', handleScrollLoadMore);
-    messagesContainer.addEventListener('scroll', handleScrollLoadMore);
-  }
 }
 
-// ============================================================
-// 메시지 페이징 로딩 변수
-// ============================================================
-const MESSAGES_PER_PAGE = 20;  // 👈 한 번에 불러올 메시지 수
-let currentMessagePage = 1;
-let isLoadingMoreMessages = false;
-let hasMoreMessages = true;
-let currentLoadingRoomId = null;
-
-async function loadMessages(roomId, isLoadMore = false) {
+async function loadMessages(roomId) {
   const container = document.getElementById('room-messages');
   if (!container) return;
   
-  // 새 방이면 페이지 초기화
-  if (currentLoadingRoomId !== roomId) {
-    currentMessagePage = 1;
-    hasMoreMessages = true;
-    currentLoadingRoomId = roomId;
-  }
+  // 로딩 표시
+  container.innerHTML = '<div class="loading-spinner"></div><div style="text-align:center; padding:20px;">메시지 불러오는 중...</div>';
   
-  if (!isLoadMore) {
-    currentMessagePage = 1;
-    hasMoreMessages = true;
-    container.innerHTML = '<div class="loading-spinner"></div><div style="text-align:center; padding:20px;">메시지 불러오는 중...</div>';
-  }
-  
-  // ✅ 페이징 처리 (최신순으로 가져와서 뒤집을 거임)
-  const start = (currentMessagePage - 1) * MESSAGES_PER_PAGE;
-  const end = currentMessagePage * MESSAGES_PER_PAGE - 1;
-  
-  const { data: messages, error } = await supabaseClient
+  // 1. 메시지만 먼저 가져오기
+  const { data: messages } = await supabaseClient
     .from('messages')
     .select('*')
     .eq('room_id', roomId)
-    .order('created_at', { ascending: false })  // 최신순
-    .range(start, end);
+    .order('created_at', { ascending: true });
   
-  if (error) {
-    console.error('메시지 로드 오류:', error);
-    return;
-  }
-  
-  // ✅ 더 불러올 메시지가 있는지 확인
-  hasMoreMessages = messages.length === MESSAGES_PER_PAGE;
-  
-  // ✅ 오래된 순으로 정렬 (화면 표시용)
-  const sortedMessages = [...messages].reverse();
-  
-  // 방 멤버 정보
+  // 2. 방 멤버 정보 (친구 목록에서 재사용)
   const memberIds = currentRoom.members || [];
+  
+  // 3. 프로필 정보 (친구 목록 + 본인)
   const memberProfiles = memberIds.map(id => {
     if (id === currentUserId) return currentUserProfile;
     return friendsList.find(f => f.id === id);
   }).filter(Boolean);
+  
   window._roomMemberProfiles = memberProfiles;
   
-  if (!isLoadMore) {
-    // 첫 로드
-    container.innerHTML = `<div class="date-sep"><span>${dateStr()}</span></div>`;
-    for (const msg of sortedMessages) {
-      if (msg.deleted_for_all) continue;
-      if (blockedList.includes(msg.sender_id)) continue;
-      const deletedForMe = msg.deleted_for_me || [];
-      if (deletedForMe.includes(currentUserId)) continue;
-      appendMessageToUI(msg);
-    }
-    container.scrollTop = container.scrollHeight;
-  } else {
-    // 추가 로드 (스크롤 위로 올리면)
-    const oldScrollHeight = container.scrollHeight;
-    for (const msg of sortedMessages) {
-      if (msg.deleted_for_all) continue;
-      if (blockedList.includes(msg.sender_id)) continue;
-      const deletedForMe = msg.deleted_for_me || [];
-      if (deletedForMe.includes(currentUserId)) continue;
-      
-      // 메시지 요소 생성 (appendMessageToUI와 동일한 방식)
-      const msgElement = createMessageElement(msg);
-      container.insertBefore(msgElement, container.firstChild);
-    }
-    // 스크롤 위치 유지
-    const newScrollHeight = container.scrollHeight;
-    container.scrollTop = newScrollHeight - oldScrollHeight;
-  }
+  // 4. 메시지 렌더링
+  container.innerHTML = `<div class="date-sep"><span>${dateStr()}</span></div>`;
   
-  currentMessagePage++;
-}
-
-// 메시지 요소 생성 함수 (appendMessageToUI와 동일)
-function createMessageElement(msg) {
-  const isMine = msg.sender_id === currentUserId;
-  const row = document.createElement('div');
-  row.className = `msg-row ${isMine ? 'mine' : 'other'}`;
-  if (msg.id) row.setAttribute('data-msg-id', msg.id);
-  
-  if (!isMine) {
-    const profiles = window._roomMemberProfiles || [];
-    const senderProfile = profiles.find(p => p.id === msg.sender_id);
-    const senderFriend = friendsList.find(f => f.id === msg.sender_id);
-    const senderAv = senderProfile?.avatar || senderFriend?.avatar || null;
-    const senderName = senderProfile?.name || senderFriend?.name || '?';
+  for (const msg of messages || []) {
+    if (msg.deleted_for_all) continue;
+    if (blockedList.includes(msg.sender_id)) continue;
     
-    const avEl = document.createElement('div');
-    avEl.className = 'msg-av avatar-base';
-    if (senderAv) {
-      avEl.style.backgroundImage = `url('${senderAv}')`;
-      avEl.style.backgroundSize = 'cover';
-      avEl.style.backgroundPosition = 'center';
-    } else {
-      avEl.innerHTML = '<i class="ti ti-user"></i>';
-    }
-    row.appendChild(avEl);
+    // ✅ 내가 나가서 삭제한 메시지는 안 보이게 필터링
+    const deletedForMe = msg.deleted_for_me || [];
+    if (deletedForMe.includes(currentUserId)) continue;
     
-    if (currentRoom.is_group) {
-      const bwrap = document.createElement('div');
-      bwrap.className = 'bwrap';
-      const nameEl = document.createElement('div');
-      nameEl.className = 'msg-sender-name';
-      nameEl.textContent = senderName;
-      const bubble = makeBubbleEl(msg, isMine);
-      const meta = makeMetaEl(msg.created_at);
-      bwrap.appendChild(nameEl);
-      bwrap.appendChild(bubble);
-      bwrap.appendChild(meta);
-      row.appendChild(bwrap);
-      return row;
-    }
+    appendMessageToUI(msg);
   }
   
-  const bwrap = document.createElement('div');
-  bwrap.className = 'bwrap';
-  const bubble = makeBubbleEl(msg, isMine);
-  const meta = makeMetaEl(msg.created_at);
-  bwrap.appendChild(bubble);
-  bwrap.appendChild(meta);
-  row.appendChild(bwrap);
-  return row;
-}
-
-// 스크롤 위로 올리면 추가 로드
-function handleScrollLoadMore() {
-  const container = document.getElementById('room-messages');
-  if (!container) return;
-  
-  if (container.scrollTop === 0 && !isLoadingMoreMessages && hasMoreMessages && currentLoadingRoomId === currentRoom?.id) {
-    isLoadingMoreMessages = true;
-    loadMessages(currentRoom.id, true).finally(() => {
-      isLoadingMoreMessages = false;
-    });
-  }
+  container.scrollTop = container.scrollHeight;
 }
 
 function appendMessageToUI(msg) {
