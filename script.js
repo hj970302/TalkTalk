@@ -128,13 +128,32 @@ async function initApp() {
     try {
       const { data: { session }, error } = await supabaseClient.auth.getSession();
       if (!error && session?.user) {
+        // ✅ DB에서 로그인 상태 확인
+        const { data: profile, error: profileError } = await supabaseClient
+          .from('profiles')
+          .select('is_logged_in')
+          .eq('id', session.user.id)
+          .single();
+        
+        // ✅ 이미 다른 기기에서 로그인되어 있으면 세션 무효화
+        if (!profileError && profile && !profile.is_logged_in) {
+          console.log('다른 기기에서 로그인되어 세션이 무효화됨');
+          localStorage.removeItem('talktalk_session');
+          await supabaseClient.auth.signOut();
+          showToast("알림", "다른 기기에서 로그인되어 로그아웃되었습니다.", "#ff4757");
+          if (authScreen) authScreen.style.display = 'flex';
+          return;
+        }
+        
         currentUserId = session.user.id;
         if (authScreen) authScreen.style.display = 'none';
         await loadUserData(session.user.id);
         showToast("환영합니다", `${currentUserProfile?.name || '사용자'}님, 자동 로그인되었습니다.`, "#fee500");
         return;
       }
-    } catch(e) {}
+    } catch(e) {
+      console.log('세션 복원 오류:', e);
+    }
   }
   
   // 로그인 안 된 경우에만 스플래시 표시
@@ -293,9 +312,16 @@ async function handleLogin() {
   const pw = document.getElementById('login-pw').value.trim();
   if (!username || !pw) { alert("아이디와 비밀번호를 모두 입력해주세요."); return; }
 
+  // ✅ 로그인 상태 확인 (이미 로그인된 계정인지)
   const { data: profile, error: profileError } = await supabaseClient
-    .from('profiles').select('id, username, name').eq('username', username).maybeSingle();
+    .from('profiles').select('id, username, name, is_logged_in').eq('username', username).maybeSingle();
   if (profileError || !profile) { alert("아이디 또는 비밀번호가 일치하지 않습니다."); return; }
+  
+  // ✅ 이미 로그인된 계정이면 차단
+  if (profile.is_logged_in) {
+    alert("⚠️ 이미 다른 기기에서 로그인되어 있는 계정입니다.\n로그아웃 후 시도해주세요.");
+    return;
+  }
 
   const { data, error } = await supabaseClient.auth.signInWithPassword({
     email: username + "@talktalk.app", password: pw
@@ -304,6 +330,13 @@ async function handleLogin() {
 
   localStorage.setItem('talktalk_session', data.user.id);
   currentUserId = data.user.id;
+  
+  // ✅ 로그인 상태 업데이트
+  await supabaseClient.from('profiles').update({ 
+    is_logged_in: true,
+    last_login_at: new Date().toISOString()
+  }).eq('id', data.user.id);
+  
   await loadUserData(data.user.id);
   document.getElementById('auth-screen').style.display = 'none';
   showToast("로그인 성공", profile.name + "님 반갑습니다!", "#fee500");
@@ -311,6 +344,11 @@ async function handleLogin() {
 }
 
 async function handleLogout() {
+  // ✅ 로그아웃 시 로그인 상태 false로 변경
+  if (currentUserId) {
+    await supabaseClient.from('profiles').update({ is_logged_in: false }).eq('id', currentUserId);
+  }
+  
   await supabaseClient.auth.signOut();
   localStorage.removeItem('talktalk_session');
   currentUserId = null; currentUserProfile = null;
