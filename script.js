@@ -28,6 +28,7 @@ let flipY = 1;
 let textEditMode = 'name';
 let selectedMessageId = null;
 let viewerContextMessageId = null;
+let isAppActive = true;  // 앱이 포그라운드에 있는지 여부
 
 /* ============================================================
    폰트 / 테마 설정
@@ -123,6 +124,13 @@ async function initApp() {
   const authScreen = document.getElementById('auth-screen');
   const splashLogo = document.getElementById('splash-logo');
   const savedSession = localStorage.getItem('talktalk_session');
+  
+  // ✅ 앱 활성화 상태 감지 (추가)
+  document.addEventListener('visibilitychange', () => {
+    isAppActive = !document.hidden;
+    console.log('앱 활성화 상태:', isAppActive ? '활성화 (푸시 알림 OFF)' : '비활성화 (푸시 알림 ON)');
+  });
+  isAppActive = !document.hidden;
   
   if (savedSession) {
     try {
@@ -1299,11 +1307,12 @@ async function handleClipFile(inputElement) {
   } else {
     appendMessageToUI(data);
     if (!roomOpen) renderChats();
-    sendPushNotification('📷 사진');
+    sendPushNotification('📷 사진', true);  // ✅ 여기에 , true 추가
   }
   
   inputElement.value = "";
 }
+
 function triggerClip() { 
   document.getElementById('clip-file-input')?.click(); 
 }
