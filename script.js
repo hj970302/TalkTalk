@@ -1108,12 +1108,17 @@ async function sendPushNotification(text) {
     const player_ids = profiles?.map(p => p.onesignal_player_id).filter(Boolean) || [];
     if (player_ids.length === 0) return;
 
-    await supabaseClient.functions.invoke('send-notification', {
-      body: {
+    await fetch('https://yrndqghsdtxoajgxvqrv.supabase.co/functions/v1/send-notification', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
         player_ids,
         title: currentUserProfile?.name || '톡톡',
         message: text.length > 50 ? text.substring(0, 50) + '...' : text,
-      }
+      })
     });
   } catch(e) {
     console.error('알림 전송 실패:', e);
