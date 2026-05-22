@@ -1456,7 +1456,7 @@ async function addNewFriendWithVerify() {
     return; 
   }
   
-  // ✅ 최신 친구 목록 로드
+  // 최신 친구 목록 로드
   await loadFriends();
   
   if (friendsList.some(f => f.id === profile.id)) {
@@ -1464,53 +1464,44 @@ async function addNewFriendWithVerify() {
     return;
   }
   
-  // ✅ 기존 친구 관계 삭제 (잔여 데이터 정리)
+  // 기존 친구 관계 삭제 (잔여 데이터 정리)
   await supabaseClient
     .from('friendships')
     .delete()
     .or(`and(user_id.eq.${currentUserId},friend_id.eq.${profile.id}),and(user_id.eq.${profile.id},friend_id.eq.${currentUserId})`);
   
-  // ✅ 새 친구 관계 추가
+  // 새 친구 관계 추가 (채팅방은 생성하지 않음!)
   await supabaseClient.from('friendships').insert([
     { user_id: currentUserId, friend_id: profile.id, status: 'accepted' },
     { user_id: profile.id, friend_id: currentUserId, status: 'accepted' }
   ]);
   
-  // ❌ ========== 여기서부터 아래 채팅방 생성 코드 전부 삭제 ==========
-  // 
-  // const { data: myRooms } = ... (삭제)
-  // let room = ... (삭제)
-  // if (!room) { ... } (삭제)
-  // chatRoomsList.push(room) (삭제)
-  //
-  // ❌ ========== 삭제 끝 ==========
-  
-  // ✅ 친구 목록 다시 로드
+  // 친구 목록 다시 로드
   await loadFriends();
   renderFriends();
-  renderChats();  // 채팅방 목록도 다시 로드 (기존 채팅방만 표시됨)
+  renderChats();
   
   showToast("친구 추가", `${profile.name}님과 친구가 되었습니다!`, "#2ed573");
   input.value = '';
 }
 
 async function removeFriend(friendId) {
-  // ✅ 친구 관계 삭제
+  // 친구 관계 삭제
   await supabaseClient
     .from('friendships')
     .delete()
     .or(`and(user_id.eq.${currentUserId},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${currentUserId})`);
 
-  // ✅ 친구 요청도 모두 삭제
+  // 친구 요청도 모두 삭제
   await supabaseClient
     .from('friend_requests')
     .delete()
     .or(`and(from_user_id.eq.${currentUserId},to_user_id.eq.${friendId}),and(from_user_id.eq.${friendId},to_user_id.eq.${currentUserId})`);
 
-  // ✅ 로컬 목록에서 제거
+  // 로컬 목록에서 제거
   friendsList = friendsList.filter(f => f.id !== friendId);
 
-  // ✅ 중요: DB에서 다시 로드하여 동기화
+  // DB에서 다시 로드하여 동기화
   await loadFriends();
 
   renderFriends();
