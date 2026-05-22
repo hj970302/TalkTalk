@@ -1030,50 +1030,171 @@ async function openRoomFromData(roomId) {
     })
     .subscribe();
 
+  // ✅ 메시지 로드 (50개)
   await loadMessages(room.id);
   await markMessagesAsRead(room.id);
+  
+  // ✅ 스크롤 이벤트 리스너 추가 (더 불러오기)
+  const messagesContainer = document.getElementById('room-messages');
+  if (messagesContainer) {
+    messagesContainer.removeEventListener('scroll', handleScrollLoadMore);
+    messagesContainer.addEventListener('scroll', handleScrollLoadMore);
+  }
 }
 
-async function loadMessages(roomId) {
+// ============================================================
+// 메시지 페이징 로딩 변수
+// ============================================================
+const MESSAGES_PER_PAGE = 20;  // 👈 여기서 개수 조정 (30, 20, 10 등)
+let currentMessagePage = 1;
+let isLoadingMoreMessages = false;
+let hasMoreMessages = true;
+let currentLoadingRoomId = null;
+
+async function loadMessages(roomId, isLoadMore = false) {
   const container = document.getElementById('room-messages');
   if (!container) return;
   
-  // 로딩 표시
-  container.innerHTML = '<div class="loading-spinner"></div><div style="text-align:center; padding:20px;">메시지 불러오는 중...</div>';
+  // ✅ 새로 로드하는 방이 다르면 페이지 초기화
+  if (currentLoadingRoomId !== roomId) {
+    currentMessagePage = 1;
+    hasMoreMessages = true;
+    currentLoadingRoomId = roomId;
+  }
   
-  // 1. 메시지만 먼저 가져오기
-  const { data: messages } = await supabaseClient
+  if (!isLoadMore) {
+    currentMessagePage = 1;
+    hasMoreMessages = true;
+    container.innerHTML = '<div class="loading-spinner"></div><div style="text-align:center; padding:20px;">메시지 불러오는 중...</div>';
+  }
+  
+  // ✅ 메시지 가져오기 (최신순으로 정렬 후 페이징)
+  const start = (currentMessagePage - 1) * 50;
+  const end = currentMessagePage * 50 - 1;
+  
+  const { data: messages, error } = await supabaseClient
     .from('messages')
     .select('*')
     .eq('room_id', roomId)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false })
+    .range(start, end);
   
-  // 2. 방 멤버 정보 (친구 목록에서 재사용)
+  if (error) {
+    console.error('메시지 로드 오류:', error);
+    return;
+  }
+  
+  // ✅ 더 불러올 메시지가 있는지 확인
+  hasMoreMessages = messages.length === 50;
+  
+  // ✅ 오래된 순으로 정렬 (화면 표시용)
+  const sortedMessages = [...messages].reverse();
+  
+  // ✅ 방 멤버 정보 (친구 목록에서 재사용)
   const memberIds = currentRoom.members || [];
-  
-  // 3. 프로필 정보 (친구 목록 + 본인)
   const memberProfiles = memberIds.map(id => {
     if (id === currentUserId) return currentUserProfile;
     return friendsList.find(f => f.id === id);
   }).filter(Boolean);
-  
   window._roomMemberProfiles = memberProfiles;
   
-  // 4. 메시지 렌더링
-  container.innerHTML = `<div class="date-sep"><span>${dateStr()}</span></div>`;
-  
-  for (const msg of messages || []) {
-    if (msg.deleted_for_all) continue;
-    if (blockedList.includes(msg.sender_id)) continue;
+  if (!isLoadMore) {
+    // ✅ 첫 로드: 전체 렌더링
+    container.innerHTML = `<div class="date-sep"><span>${dateStr()}</span></div>`;
     
-    // ✅ 내가 나가서 삭제한 메시지는 안 보이게 필터링
-    const deletedForMe = msg.deleted_for_me || [];
-    if (deletedForMe.includes(currentUserId)) continue;
+    for (const msg of sortedMessages) {
+      if (msg.deleted_for_all) continue;
+      if (blockedList.includes(msg.sender_id)) continue;
+      const deletedForMe = msg.deleted_for_me || [];
+      if (deletedForMe.includes(currentUserId)) continue;
+      appendMessageToUI(msg);
+    }
+    container.scrollTop = container.scrollHeight;
+  } else {
+    // ✅ 추가 로드: 기존 스크롤 위치 유지하면서 맨 위에 추가
+    const oldScrollHeight = container.scrollHeight;
     
-    appendMessageToUI(msg);
+    for (const msg of sortedMessages) {
+      if (msg.deleted_for_all) continue;
+      if (blockedList.includes(msg.sender_id)) continue;
+      const deletedForMe = msg.deleted_for_me || [];
+      if (deletedForMe.includes(currentUserId)) continue;
+      
+      const msgElement = createMessageElement(msg);
+      container.insertBefore(msgElement, container.firstChild);
+    }
+    
+    // ✅ 스크롤 위치 조정 (새로 추가된 만큼 내려줌)
+    const newScrollHeight = container.scrollHeight;
+    container.scrollTop = newScrollHeight - oldScrollHeight;
   }
   
-  container.scrollTop = container.scrollHeight;
+  currentMessagePage++;
+}
+
+// ✅ 메시지 요소 생성 함수 (appendMessageToUI와 동일한 로직)
+function createMessageElement(msg) {
+  const isMine = msg.sender_id === currentUserId;
+  const row = document.createElement('div');
+  row.className = `msg-row ${isMine ? 'mine' : 'other'}`;
+  if (msg.id) row.setAttribute('data-msg-id', msg.id);
+  
+  if (!isMine) {
+    const profiles = window._roomMemberProfiles || [];
+    const senderProfile = profiles.find(p => p.id === msg.sender_id);
+    const senderFriend = friendsList.find(f => f.id === msg.sender_id);
+    const senderAv = senderProfile?.avatar || senderFriend?.avatar || null;
+    const senderName = senderProfile?.name || senderFriend?.name || '?';
+    
+    const avEl = document.createElement('div');
+    avEl.className = 'msg-av avatar-base';
+    if (senderAv) {
+      avEl.style.backgroundImage = `url('${senderAv}')`;
+      avEl.style.backgroundSize = 'cover';
+      avEl.style.backgroundPosition = 'center';
+    } else {
+      avEl.innerHTML = '<i class="ti ti-user"></i>';
+    }
+    row.appendChild(avEl);
+    
+    if (currentRoom.is_group) {
+      const bwrap = document.createElement('div');
+      bwrap.className = 'bwrap';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'msg-sender-name';
+      nameEl.textContent = senderName;
+      const bubble = makeBubbleEl(msg, isMine);
+      const meta = makeMetaEl(msg.created_at);
+      bwrap.appendChild(nameEl);
+      bwrap.appendChild(bubble);
+      bwrap.appendChild(meta);
+      row.appendChild(bwrap);
+      return row;
+    }
+  }
+  
+  const bwrap = document.createElement('div');
+  bwrap.className = 'bwrap';
+  const bubble = makeBubbleEl(msg, isMine);
+  const meta = makeMetaEl(msg.created_at);
+  bwrap.appendChild(bubble);
+  bwrap.appendChild(meta);
+  row.appendChild(bwrap);
+  return row;
+}
+
+// ✅ 스크롤 위로 올리면 추가 로드
+function handleScrollLoadMore() {
+  const container = document.getElementById('room-messages');
+  if (!container) return;
+  
+  // 스크롤이 맨 위에 있고, 로딩 중이 아니며, 더 있을 때
+  if (container.scrollTop === 0 && !isLoadingMoreMessages && hasMoreMessages && currentLoadingRoomId === currentRoom?.id) {
+    isLoadingMoreMessages = true;
+    loadMessages(currentRoom.id, true).finally(() => {
+      isLoadingMoreMessages = false;
+    });
+  }
 }
 
 function appendMessageToUI(msg) {
