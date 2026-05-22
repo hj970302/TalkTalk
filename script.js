@@ -395,8 +395,6 @@ function renderRecommendSection() {
   // ✅ friendRequests에서 아직 응답하지 않은 요청만 가져오기
   const pendingRequests = friendRequests.filter(req => req.status === 'pending');
   
-  console.log('받은 친구 요청 개수:', pendingRequests.length);  // 디버깅용
-  
   if (pendingRequests.length === 0) return '';
   
   let html = `<div class="normal-section"><div class="section-title" style="color:#888;">📨 받은 친구 요청 ${pendingRequests.length}</div>`;
