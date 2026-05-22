@@ -848,10 +848,37 @@ async function openRoomFromData(roomId) {
   currentRoom = room;
   roomOpen = true;
 
-  // 멤버 수 표시
+  // ✅ 1:1 채팅방이면 상대방 이름으로 제목 설정
+  let displayTitle = room.name || (room.is_group ? '단체방' : '대화');
+  
+  if (!room.is_group && room.members) {
+    const otherId = room.members.find(id => id !== currentUserId);
+    if (otherId) {
+      // friendsList에서 상대방 정보 찾기
+      const otherUser = friendsList.find(f => f.id === otherId);
+      if (otherUser) {
+        displayTitle = otherUser.name;
+      } else {
+        // friendsList에 없으면 DB에서 직접 조회
+        const { data: otherProfile } = await supabaseClient
+          .from('profiles')
+          .select('name')
+          .eq('id', otherId)
+          .single();
+        if (otherProfile) {
+          displayTitle = otherProfile.name;
+        }
+      }
+    }
+  }
+  
+  // 단체방이면 멤버 수 표시, 개인톡은 멤버 수 숨김
   const memberCount = room.members?.length || 0;
-  const roomTitle = room.name || (room.is_group ? '단체방' : '대화');
-  document.getElementById('room-title').innerHTML = `${roomTitle} <span style="font-size:12px; opacity:0.7; font-weight:normal;">(${memberCount})</span>`;
+  if (room.is_group) {
+    document.getElementById('room-title').innerHTML = `${displayTitle} <span style="font-size:12px; opacity:0.7; font-weight:normal;">(${memberCount})</span>`;
+  } else {
+    document.getElementById('room-title').innerHTML = displayTitle;
+  }
   
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-room').classList.add('active');
