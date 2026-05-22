@@ -1456,30 +1456,52 @@ async function addNewFriendWithVerify() {
     return; 
   }
   
-  // ✅ 1. 기존 모든 관계 삭제 (친구 + 친구요청)
+  // ✅ 중요: 먼저 최신 친구 목록 로드
+  await loadFriends();
+  
+  // ✅ 최신 목록으로 체크
+  if (friendsList.some(f => f.id === profile.id)) {
+    showToast("알림", `${profile.name}님은 이미 친구입니다.`, "#888");
+    return;
+  }
+  
+  // ✅ 기존 친구 관계 삭제 (잔여 데이터 정리)
   await supabaseClient
     .from('friendships')
     .delete()
     .or(`and(user_id.eq.${currentUserId},friend_id.eq.${profile.id}),and(user_id.eq.${profile.id},friend_id.eq.${currentUserId})`);
   
-  await supabaseClient
-    .from('friend_requests')
-    .delete()
-    .or(`and(from_user_id.eq.${currentUserId},to_user_id.eq.${profile.id}),and(from_user_id.eq.${profile.id},to_user_id.eq.${currentUserId})`);
-  
-  // ✅ 2. 로컬 friendsList에서 제거
-  friendsList = friendsList.filter(f => f.id !== profile.id);
-  
-  // ✅ 3. 새 친구 관계 추가 (바로 accepted 상태로)
+  // ✅ 새로 추가
   await supabaseClient.from('friendships').insert([
     { user_id: currentUserId, friend_id: profile.id, status: 'accepted' },
     { user_id: profile.id, friend_id: currentUserId, status: 'accepted' }
   ]);
   
-  // ✅ 4. 채팅방 처리
-  let room = chatRoomsList.find(r => 
-    !r.is_group && r.members?.includes(profile.id) && r.members?.includes(currentUserId)
-  );
+  // ✅ 채팅방 확인/생성
+  const { data: myRooms } = await supabaseClient
+    .from('chat_room_members')
+    .select('room_id')
+    .eq('user_id', currentUserId);
+  
+  const myRoomIds = myRooms?.map(r => r.room_id) || [];
+  let room = null;
+  
+  if (myRoomIds.length > 0) {
+    const { data: sharedRooms } = await supabaseClient
+      .from('chat_room_members')
+      .select('room_id')
+      .eq('user_id', profile.id)
+      .in('room_id', myRoomIds);
+    
+    if (sharedRooms && sharedRooms.length > 0) {
+      const { data: roomData } = await supabaseClient
+        .from('chat_rooms')
+        .select('*')
+        .eq('id', sharedRooms[0].room_id)
+        .single();
+      room = roomData;
+    }
+  }
   
   if (!room) {
     const { data: newRoom } = await supabaseClient
@@ -1487,29 +1509,17 @@ async function addNewFriendWithVerify() {
       .insert({ name: profile.name, is_group: false, created_by: currentUserId })
       .select()
       .single();
-    
-    if (newRoom) {
+    room = newRoom;
+    if (room) {
       await supabaseClient.from('chat_room_members').insert([
-        { room_id: newRoom.id, user_id: currentUserId },
-        { room_id: newRoom.id, user_id: profile.id }
+        { room_id: room.id, user_id: currentUserId },
+        { room_id: room.id, user_id: profile.id }
       ]);
-      newRoom.members = [currentUserId, profile.id];
-      chatRoomsList.push(newRoom);
-      room = newRoom;
     }
   }
   
-  // ✅ 5. friendsList에 추가
-  friendsList.push({
-    id: profile.id,
-    username: profile.username,
-    name: profile.name,
-    status: profile.status || '',
-    avatar: profile.avatar || null,
-    isFavorite: false
-  });
-  
-  // ✅ 6. UI 새로고침
+  // ✅ 최종 친구 목록 다시 로드
+  await loadFriends();
   renderFriends();
   renderChats();
   
@@ -1523,24 +1533,22 @@ async function removeFriend(friendId) {
     .from('friendships')
     .delete()
     .or(`and(user_id.eq.${currentUserId},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${currentUserId})`);
-  
+
   // ✅ 친구 요청도 모두 삭제
   await supabaseClient
     .from('friend_requests')
     .delete()
     .or(`and(from_user_id.eq.${currentUserId},to_user_id.eq.${friendId}),and(from_user_id.eq.${friendId},to_user_id.eq.${currentUserId})`);
-  
-  // ✅ 차단 상태 해제
-  if (blockedList.includes(friendId)) {
-    await supabaseClient.from('blocks').delete().eq('user_id', currentUserId).eq('blocked_id', friendId);
-    blockedList = blockedList.filter(id => id !== friendId);
-  }
-  
+
   // ✅ 로컬 목록에서 제거
   friendsList = friendsList.filter(f => f.id !== friendId);
-  
+
+  // ✅ 중요: DB에서 다시 로드하여 동기화
+  await loadFriends();
+
   renderFriends();
   renderManageList();
+
   showToast("친구 삭제", "친구 목록에서 제거되었습니다.", "#ff4757");
 }
 
