@@ -366,80 +366,44 @@ async function handleLogout() {
 /* ============================================================
    친구 렌더링
    ============================================================ */
-function renderFriends() {
-  // renderFriendRequests(); 
-  const container = document.getElementById('friends-list-container');
-  if (!container) return;
-  
-  const filtered = friendsList.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
-  const favoriteFriends = filtered.filter(f => f.isFavorite);
-  const normalFriends = filtered.filter(f => !f.isFavorite);
-
-  let html = "";
-  
-  if (favoriteFriends.length > 0) {
-    html += `<div class="favorite-section"><div class="section-title">즐겨찾기 ${favoriteFriends.length}</div>`;
-    html += favoriteFriends.map(f => makeFriendItemHTML(f)).join('');
-    html += `</div>`;
-  }
-  
-  html += `<div class="normal-section"><div class="section-title">친구 ${normalFriends.length}</div>`;
-  
-  if (normalFriends.length === 0 && favoriteFriends.length === 0) {
-    html += `<div class="empty-state"><p>등록된 친구가 없습니다.</p></div>`;
-  } else {
-    html += normalFriends.map(f => makeFriendItemHTML(f)).join('');
-  }
-  html += `</div>`;
-
-  container.innerHTML = html;
-}
-
-function renderRecommendSection() {
-  // ✅ friendRequests에서 아직 응답하지 않은 요청만 가져오기
-  const pendingRequests = friendRequests.filter(req => req.status === 'pending');
-  
-  if (pendingRequests.length === 0) return '';
-  
-  let html = `<div class="normal-section"><div class="section-title" style="color:#888;">📨 받은 친구 요청 ${pendingRequests.length}</div>`;
-  html += pendingRequests.map(req => {
-    const fromUser = req.from;
-    if (!fromUser) return '';
-    
-    return `
-      <div class="friend-item" style="opacity:0.75;">
-        <div class="avatar-sm avatar-base">${fromUser.avatar ? `<div style="width:100%;height:100%;background:url('${fromUser.avatar}') center/cover;border-radius:50%;"></div>` : '<i class="ti ti-user"></i>'}</div>
-        <div style="flex:1;">
-          <div class="fi-name">${fromUser.name}</div>
-          <div class="fi-status">${fromUser.status || ''}</div>
-        </div>
-        <div style="display: flex; gap: 6px;">
-          <button onclick="respondToFriendRequest('${req.id}', 'accept')" style="background:#2ed573; border:none; border-radius:8px; padding:5px 10px; font-size:12px; font-weight:700; color:white; cursor:pointer;">✅ 수락</button>
-          <button onclick="respondToFriendRequest('${req.id}', 'reject')" style="background:#ff4757; border:none; border-radius:8px; padding:5px 10px; font-size:12px; font-weight:700; color:white; cursor:pointer;">❌ 거절</button>
-        </div>
-      </div>
-    `;
-  }).join('');
-  html += `</div>`;
-  return html;
-}
 async function quickAddFriend(friendId, friendUsername, friendName) {
-  if (friendsList.some(f => f.id === friendId)) { showToast("알림","이미 친구입니다.","#888"); return; }
-  await supabaseClient.from('friendships').insert({ user_id: currentUserId, friend_id: friendId, status: 'accepted' });
-  const { data: room } = await supabaseClient.from('chat_rooms').insert({
-    name: friendName, is_group: false, created_by: currentUserId
-  }).select().single();
-  if (room) {
-    await supabaseClient.from('chat_room_members').insert([
-      { room_id: room.id, user_id: currentUserId },
-      { room_id: room.id, user_id: friendId }
-    ]);
-    chatRoomsList.push(room);
+
+  if (friendsList.some(f => f.id === friendId)) {
+    showToast("알림","이미 친구입니다.","#888");
+    return;
   }
-  const { data: fullProfile } = await supabaseClient.from('profiles').select('*').eq('id', friendId).single();
-  friendsList.push({ id: friendId, username: friendUsername, name: friendName, status: fullProfile?.status||'', avatar: fullProfile?.avatar||null, isFavorite: false });
-  renderFriends(); renderChats();
-  showToast("친구 추가", `${friendName}님과 친구가 되었습니다!`, "#2ed573");
+
+  // 친구 관계만 추가
+  await supabaseClient.from('friendships').insert({
+    user_id: currentUserId,
+    friend_id: friendId,
+    status: 'accepted'
+  });
+
+  // 프로필 불러오기
+  const { data: fullProfile } = await supabaseClient
+    .from('profiles')
+    .select('*')
+    .eq('id', friendId)
+    .single();
+
+  // 친구목록 추가
+  friendsList.push({
+    id: friendId,
+    username: friendUsername,
+    name: friendName,
+    status: fullProfile?.status || '',
+    avatar: fullProfile?.avatar || null,
+    isFavorite: false
+  });
+
+  renderFriends();
+
+  showToast(
+    "친구 추가",
+    `${friendName}님과 친구가 되었습니다!`,
+    "#2ed573"
+  );
 }
 
 function makeFriendItemHTML(f) {
