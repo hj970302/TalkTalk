@@ -28,7 +28,6 @@ let flipY = 1;
 let textEditMode = 'name';
 let selectedMessageId = null;
 let viewerContextMessageId = null;
-let isAppActive = true;  // 앱이 포그라운드에 있는지 여부
 
 /* ============================================================
    폰트 / 테마 설정
@@ -87,12 +86,6 @@ function showToast(title, message, color='#333') {
   setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 200); }, 2500);
 }
 function showChatNotification(name, text, avatarUrl, roomId) {
-  // ✅ 앱이 활성화되어 있으면 토스트 알림 표시 안 함
-  if (isAppActive) {
-    console.log('앱 활성화 상태 - 토스트 알림 생략');
-    return;
-  }
-  
   const tc = document.getElementById('toast-container');
   if (!tc) return;
   const t = document.createElement('div');
@@ -108,7 +101,6 @@ function showChatNotification(name, text, avatarUrl, roomId) {
   tc.appendChild(t);
   setTimeout(() => { if (t.parentNode) { t.classList.add('hiding'); setTimeout(() => t.remove(), 200); } }, 3500);
 }
-
 function applyAvatarStyle(element, imgUrl) {
   if (!element) return;
   if (imgUrl) {
@@ -131,13 +123,6 @@ async function initApp() {
   const authScreen = document.getElementById('auth-screen');
   const splashLogo = document.getElementById('splash-logo');
   const savedSession = localStorage.getItem('talktalk_session');
-  
-  // ✅ 앱 활성화 상태 감지 (추가)
-  document.addEventListener('visibilitychange', () => {
-    isAppActive = !document.hidden;
-    console.log('앱 활성화 상태:', isAppActive ? '활성화 (푸시 알림 OFF)' : '비활성화 (푸시 알림 ON)');
-  });
-  isAppActive = !document.hidden;
   
   if (savedSession) {
     try {
@@ -1314,12 +1299,11 @@ async function handleClipFile(inputElement) {
   } else {
     appendMessageToUI(data);
     if (!roomOpen) renderChats();
-    sendPushNotification('📷 사진', true);  // ✅ 여기에 , true 추가
+    sendPushNotification('📷 사진');
   }
   
   inputElement.value = "";
 }
-
 function triggerClip() { 
   document.getElementById('clip-file-input')?.click(); 
 }
