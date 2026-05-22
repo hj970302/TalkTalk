@@ -2058,14 +2058,6 @@ async function respondToFriendRequest(requestId, action) {
       { user_id: req.from_user_id, friend_id: currentUserId, status: 'accepted' }
     ]);
     
-    // 채팅방 생성
-    const { data: profile } = await supabaseClient.from('profiles').select('name').eq('id', req.from_user_id).single();
-    const { data: room } = await supabaseClient.from('chat_rooms').insert({ name: profile.name, is_group: false, created_by: currentUserId }).select().single();
-    await supabaseClient.from('chat_room_members').insert([
-      { room_id: room.id, user_id: currentUserId },
-      { room_id: room.id, user_id: req.from_user_id }
-    ]);
-    
     await loadFriends();
     renderFriends();
     renderChats();
