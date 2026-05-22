@@ -1479,15 +1479,23 @@ async function addNewFriendWithVerify() {
 }
 
 async function removeFriend(friendId) {
-  await supabaseClient.from('friendships').delete().eq('user_id', currentUserId).eq('friend_id', friendId);
-  // 차단 상태도 해제
+  // ✅ 양방향 모두 삭제 (내가 상대방을 삭제하면 상대방의 친구목록에서도 내가 사라짐)
+  await supabaseClient
+    .from('friendships')
+    .delete()
+    .or(`and(user_id.eq.${currentUserId},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${currentUserId})`);
+  
+  // 차단 상태도 해제 (선택)
   if (blockedList.includes(friendId)) {
     await supabaseClient.from('blocks').delete().eq('user_id', currentUserId).eq('blocked_id', friendId);
     blockedList = blockedList.filter(id => id !== friendId);
   }
+  
+  // 내 친구 목록에서 제거
   friendsList = friendsList.filter(f => f.id !== friendId);
-  renderFriends(); renderManageList();
-  showToast("친구 삭제","친구 목록에서 제거되었습니다.","#ff4757");
+  renderFriends();
+  renderManageList();
+  showToast("친구 삭제", "친구 목록에서 제거되었습니다.", "#ff4757");
 }
 
 /* ============================================================
