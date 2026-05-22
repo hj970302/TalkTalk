@@ -819,14 +819,14 @@ async function chatSwipeAction(action, roomId) {
   } else if (action === 'leave') {
     if (!confirm("채팅방에서 나가시겠습니까? 나가면 대화 내용이 삭제됩니다.")) return;
     
-    // ✅ 1. DB에서 채팅방 멤버 삭제 (이게 핵심!)
+    // ✅ DB에서 채팅방 멤버 삭제
     await supabaseClient
       .from('chat_room_members')
       .delete()
       .eq('room_id', roomId)
       .eq('user_id', currentUserId);
     
-    // ✅ 2. 방에 아무도 없으면 방 자체도 삭제
+    // ✅ 방에 아무도 없으면 방 자체도 삭제
     const { count } = await supabaseClient
       .from('chat_room_members')
       .select('*', { count: 'exact', head: true })
@@ -836,10 +836,10 @@ async function chatSwipeAction(action, roomId) {
       await supabaseClient.from('chat_rooms').delete().eq('id', roomId);
     }
     
-    // ✅ 3. UI에서 제거
+    // ✅ UI에서 제거
     chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
     
-    // ✅ 4. 현재 채팅방 열려있으면 닫기
+    // ✅ 현재 채팅방 열려있으면 닫기
     if (roomOpen && currentRoom.id === roomId) {
       closeRoom();
     }
@@ -847,22 +847,7 @@ async function chatSwipeAction(action, roomId) {
     renderChats();
     showToast("채팅방", "채팅방에서 나갔습니다.", "#ff4757");
   }
-}
-    
-    await Promise.all(updatePromises.filter(Boolean));
-    
-    // 2. 채팅방 목록에서만 제거 (UI에서 숨김)
-    chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
-    
-    // 3. 현재 채팅방 열려있으면 닫기
-    if (roomOpen && currentRoom.id === roomId) {
-      closeRoom();
-    }
-    
-    renderChats();
-    showToast("채팅방", "채팅방에서 나갔습니다. 대화 내용이 삭제되었습니다.", "#ff4757");
-  }
-}
+}  // 👈 함수는 여기서 끝 (중괄호 하나만 있음)
 
 /* ============================================================
    채팅방 열기
