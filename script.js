@@ -819,25 +819,35 @@ async function chatSwipeAction(action, roomId) {
   } else if (action === 'leave') {
     if (!confirm("채팅방에서 나가시겠습니까? 나가면 대화 내용이 삭제됩니다.")) return;
     
-    // ✅ 멤버 삭제하지 않음! (채팅방 재입장을 위해 DB 멤버는 유지)
+    // ✅ 1. DB에서 채팅방 멤버 삭제 (이게 핵심!)
+    await supabaseClient
+      .from('chat_room_members')
+      .delete()
+      .eq('room_id', roomId)
+      .eq('user_id', currentUserId);
     
-    // 1. 모든 메시지에 내 ID를 deleted_for_me 배열에 추가 (병렬 처리로 속도 개선)
-    const { data: messages } = await supabaseClient
-      .from('messages')
-      .select('id, deleted_for_me')
+    // ✅ 2. 방에 아무도 없으면 방 자체도 삭제
+    const { count } = await supabaseClient
+      .from('chat_room_members')
+      .select('*', { count: 'exact', head: true })
       .eq('room_id', roomId);
     
-    // ✅ 병렬로 모든 업데이트 실행
-    const updatePromises = (messages || []).map(async (msg) => {
-      const currentDeleted = msg.deleted_for_me || [];
-      if (!currentDeleted.includes(currentUserId)) {
-        return supabaseClient
-          .from('messages')
-          .update({ deleted_for_me: [...currentDeleted, currentUserId] })
-          .eq('id', msg.id);
-      }
-      return null;
-    });
+    if (count === 0) {
+      await supabaseClient.from('chat_rooms').delete().eq('id', roomId);
+    }
+    
+    // ✅ 3. UI에서 제거
+    chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
+    
+    // ✅ 4. 현재 채팅방 열려있으면 닫기
+    if (roomOpen && currentRoom.id === roomId) {
+      closeRoom();
+    }
+    
+    renderChats();
+    showToast("채팅방", "채팅방에서 나갔습니다.", "#ff4757");
+  }
+}
     
     await Promise.all(updatePromises.filter(Boolean));
     
@@ -1045,7 +1055,7 @@ async function openRoomFromData(roomId) {
 // ============================================================
 // 메시지 페이징 로딩 변수
 // ============================================================
-const MESSAGES_PER_PAGE = 20;  // 👈 여기서 개수 조정 (30, 20, 10 등)
+const MESSAGES_PER_PAGE = 20;  // 👈 한 번에 불러올 메시지 수
 let currentMessagePage = 1;
 let isLoadingMoreMessages = false;
 let hasMoreMessages = true;
@@ -1055,7 +1065,7 @@ async function loadMessages(roomId, isLoadMore = false) {
   const container = document.getElementById('room-messages');
   if (!container) return;
   
-  // ✅ 새로 로드하는 방이 다르면 페이지 초기화
+  // 새 방이면 페이지 초기화
   if (currentLoadingRoomId !== roomId) {
     currentMessagePage = 1;
     hasMoreMessages = true;
@@ -1068,15 +1078,15 @@ async function loadMessages(roomId, isLoadMore = false) {
     container.innerHTML = '<div class="loading-spinner"></div><div style="text-align:center; padding:20px;">메시지 불러오는 중...</div>';
   }
   
-  // ✅ 메시지 가져오기 (최신순으로 정렬 후 페이징)
-  const start = (currentMessagePage - 1) * 50;
-  const end = currentMessagePage * 50 - 1;
+  // ✅ 페이징 처리 (최신순으로 가져와서 뒤집을 거임)
+  const start = (currentMessagePage - 1) * MESSAGES_PER_PAGE;
+  const end = currentMessagePage * MESSAGES_PER_PAGE - 1;
   
   const { data: messages, error } = await supabaseClient
     .from('messages')
     .select('*')
     .eq('room_id', roomId)
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false })  // 최신순
     .range(start, end);
   
   if (error) {
@@ -1085,12 +1095,12 @@ async function loadMessages(roomId, isLoadMore = false) {
   }
   
   // ✅ 더 불러올 메시지가 있는지 확인
-  hasMoreMessages = messages.length === 50;
+  hasMoreMessages = messages.length === MESSAGES_PER_PAGE;
   
   // ✅ 오래된 순으로 정렬 (화면 표시용)
   const sortedMessages = [...messages].reverse();
   
-  // ✅ 방 멤버 정보 (친구 목록에서 재사용)
+  // 방 멤버 정보
   const memberIds = currentRoom.members || [];
   const memberProfiles = memberIds.map(id => {
     if (id === currentUserId) return currentUserProfile;
@@ -1099,9 +1109,8 @@ async function loadMessages(roomId, isLoadMore = false) {
   window._roomMemberProfiles = memberProfiles;
   
   if (!isLoadMore) {
-    // ✅ 첫 로드: 전체 렌더링
+    // 첫 로드
     container.innerHTML = `<div class="date-sep"><span>${dateStr()}</span></div>`;
-    
     for (const msg of sortedMessages) {
       if (msg.deleted_for_all) continue;
       if (blockedList.includes(msg.sender_id)) continue;
@@ -1111,20 +1120,19 @@ async function loadMessages(roomId, isLoadMore = false) {
     }
     container.scrollTop = container.scrollHeight;
   } else {
-    // ✅ 추가 로드: 기존 스크롤 위치 유지하면서 맨 위에 추가
+    // 추가 로드 (스크롤 위로 올리면)
     const oldScrollHeight = container.scrollHeight;
-    
     for (const msg of sortedMessages) {
       if (msg.deleted_for_all) continue;
       if (blockedList.includes(msg.sender_id)) continue;
       const deletedForMe = msg.deleted_for_me || [];
       if (deletedForMe.includes(currentUserId)) continue;
       
+      // 메시지 요소 생성 (appendMessageToUI와 동일한 방식)
       const msgElement = createMessageElement(msg);
       container.insertBefore(msgElement, container.firstChild);
     }
-    
-    // ✅ 스크롤 위치 조정 (새로 추가된 만큼 내려줌)
+    // 스크롤 위치 유지
     const newScrollHeight = container.scrollHeight;
     container.scrollTop = newScrollHeight - oldScrollHeight;
   }
@@ -1132,7 +1140,7 @@ async function loadMessages(roomId, isLoadMore = false) {
   currentMessagePage++;
 }
 
-// ✅ 메시지 요소 생성 함수 (appendMessageToUI와 동일한 로직)
+// 메시지 요소 생성 함수 (appendMessageToUI와 동일)
 function createMessageElement(msg) {
   const isMine = msg.sender_id === currentUserId;
   const row = document.createElement('div');
@@ -1183,12 +1191,11 @@ function createMessageElement(msg) {
   return row;
 }
 
-// ✅ 스크롤 위로 올리면 추가 로드
+// 스크롤 위로 올리면 추가 로드
 function handleScrollLoadMore() {
   const container = document.getElementById('room-messages');
   if (!container) return;
   
-  // 스크롤이 맨 위에 있고, 로딩 중이 아니며, 더 있을 때
   if (container.scrollTop === 0 && !isLoadingMoreMessages && hasMoreMessages && currentLoadingRoomId === currentRoom?.id) {
     isLoadingMoreMessages = true;
     loadMessages(currentRoom.id, true).finally(() => {
