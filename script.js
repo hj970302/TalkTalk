@@ -1450,7 +1450,15 @@ async function addNewFriendWithVerify() {
   
   if (!profile) { alert("존재하지 않는 아이디입니다."); return; }
   
-  // ✅ 기존 친구 관계 확인 (양방향)
+  // ✅ 현재 친구 목록에 이미 있는지 확인 (UI 상태)
+  const alreadyFriend = friendsList.some(f => f.id === profile.id);
+  if (alreadyFriend) {
+    showToast("알림", `${profile.name}님은 이미 친구입니다.`, "#ff4757");
+    input.value = '';
+    return;
+  }
+  
+  // ✅ 기존 친구 관계 확인 (DB)
   const { data: existingFriendship } = await supabaseClient
     .from('friendships')
     .select('id')
@@ -1458,30 +1466,23 @@ async function addNewFriendWithVerify() {
     .maybeSingle();
   
   if (existingFriendship) {
-    // ✅ 기존 관계 삭제 후 다시 추가 (강제)
+    // ✅ 기존 관계 삭제
     await supabaseClient
       .from('friendships')
       .delete()
       .or(`and(user_id.eq.${currentUserId},friend_id.eq.${profile.id}),and(user_id.eq.${profile.id},friend_id.eq.${currentUserId})`);
     
-    // 새로 추가
-    await supabaseClient.from('friendships').insert([
-      { user_id: currentUserId, friend_id: profile.id, status: 'accepted' },
-      { user_id: profile.id, friend_id: currentUserId, status: 'accepted' }
-    ]);
-    
-    showToast("친구 추가", `${profile.name}님과 친구 관계가 복원되었습니다.`, "#2ed573");
-  } else {
-    // 새로운 친구 관계 추가
-    await supabaseClient.from('friendships').insert([
-      { user_id: currentUserId, friend_id: profile.id, status: 'accepted' },
-      { user_id: profile.id, friend_id: currentUserId, status: 'accepted' }
-    ]);
-    
-    showToast("친구 추가", `${profile.name}님과 친구가 되었습니다!`, "#2ed573");
+    // ✅ 친구 목록에서도 제거 (UI 동기화)
+    friendsList = friendsList.filter(f => f.id !== profile.id);
   }
   
-  // ✅ 채팅방 확인
+  // 새로 추가
+  await supabaseClient.from('friendships').insert([
+    { user_id: currentUserId, friend_id: profile.id, status: 'accepted' },
+    { user_id: profile.id, friend_id: currentUserId, status: 'accepted' }
+  ]);
+  
+  // ✅ 채팅방 확인/생성
   const { data: myRooms } = await supabaseClient
     .from('chat_room_members')
     .select('room_id')
@@ -1520,10 +1521,12 @@ async function addNewFriendWithVerify() {
     ]);
   }
   
+  // ✅ 다시 로드
   await loadFriends();
   renderFriends();
   renderChats();
   
+  showToast("친구 추가", `${profile.name}님과 친구가 되었습니다!`, "#2ed573");
   input.value = '';
 }
 
