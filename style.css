@@ -222,50 +222,14 @@ html, body {
 /* ============================================================
    화면 & 헤더
    ============================================================ */
-.screen { 
-  display: none; 
-  flex-direction: column; 
-  overflow: hidden; 
-  background: var(--bg);
-}
-.screen.active { 
-  display: flex; 
-}
+.screen { flex: 1; display: none; flex-direction: column; overflow: hidden; background: var(--bg); }
+.screen.active { display: flex; }
+.top-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; background: var(--top-bar); flex-shrink: 0; border-bottom: 0.5px solid var(--border); }
+.top-bar h1 { font-size: 21px; font-weight: 800; color: var(--text); }
+.top-icons { display: flex; gap: 4px; }
+.top-icons i { font-size: 22px; color: var(--text2); cursor: pointer; padding: 5px; border-radius: 8px; }
+.scroll-area { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
-.top-bar { 
-  display: flex; 
-  align-items: center; 
-  justify-content: space-between; 
-  padding: 14px 16px 10px; 
-  background: var(--top-bar); 
-  flex-shrink: 0; 
-  border-bottom: 0.5px solid var(--border); 
-}
-
-.top-bar h1 { 
-  font-size: 21px; 
-  font-weight: 800; 
-  color: var(--text); 
-}
-
-.top-icons { 
-  display: flex; 
-  gap: 4px; 
-}
-
-.top-icons i { 
-  font-size: 22px; 
-  color: var(--text2); 
-  cursor: pointer; 
-  padding: 5px; 
-  border-radius: 8px; 
-}
-
-.scroll-area { 
-  flex: 1; 
-  overflow-y: auto; 
-  -webkit-overflow-scrolling: touch; 
-}
 /* ============================================================
    검색바
    ============================================================ */
