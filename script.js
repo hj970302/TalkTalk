@@ -1450,7 +1450,7 @@ async function addNewFriendWithVerify() {
   
   if (!profile) { alert("존재하지 않는 아이디입니다."); return; }
   
-  // ✅ 이미 친구인지 확인 (양방향)
+  // ✅ 기존 친구 관계 확인 (양방향)
   const { data: existingFriendship } = await supabaseClient
     .from('friendships')
     .select('id')
@@ -1458,21 +1458,30 @@ async function addNewFriendWithVerify() {
     .maybeSingle();
   
   if (existingFriendship) {
-    // 이미 친구면 목록 새로고침 후 종료
-    await loadFriends();
-    renderFriends();
-    alert("이미 친구입니다.");
-    input.value = '';
-    return;
+    // ✅ 기존 관계 삭제 후 다시 추가 (강제)
+    await supabaseClient
+      .from('friendships')
+      .delete()
+      .or(`and(user_id.eq.${currentUserId},friend_id.eq.${profile.id}),and(user_id.eq.${profile.id},friend_id.eq.${currentUserId})`);
+    
+    // 새로 추가
+    await supabaseClient.from('friendships').insert([
+      { user_id: currentUserId, friend_id: profile.id, status: 'accepted' },
+      { user_id: profile.id, friend_id: currentUserId, status: 'accepted' }
+    ]);
+    
+    showToast("친구 추가", `${profile.name}님과 친구 관계가 복원되었습니다.`, "#2ed573");
+  } else {
+    // 새로운 친구 관계 추가
+    await supabaseClient.from('friendships').insert([
+      { user_id: currentUserId, friend_id: profile.id, status: 'accepted' },
+      { user_id: profile.id, friend_id: currentUserId, status: 'accepted' }
+    ]);
+    
+    showToast("친구 추가", `${profile.name}님과 친구가 되었습니다!`, "#2ed573");
   }
   
-  // ✅ 새로운 친구 관계 추가 (양방향)
-  await supabaseClient.from('friendships').insert([
-    { user_id: currentUserId, friend_id: profile.id, status: 'accepted' },
-    { user_id: profile.id, friend_id: currentUserId, status: 'accepted' }
-  ]);
-  
-  // ✅ 1:1 채팅방 확인 (없으면 생성)
+  // ✅ 채팅방 확인
   const { data: myRooms } = await supabaseClient
     .from('chat_room_members')
     .select('room_id')
@@ -1511,12 +1520,10 @@ async function addNewFriendWithVerify() {
     ]);
   }
   
-  // ✅ 친구 목록 새로고침
   await loadFriends();
   renderFriends();
   renderChats();
   
-  showToast("친구 추가", `${profile.name}님과 친구가 되었습니다!`, "#2ed573");
   input.value = '';
 }
 
