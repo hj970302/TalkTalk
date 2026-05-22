@@ -569,14 +569,13 @@ async function renderChats() {
     }
   }
 
-  // 3. ✅ 안 읽은 메시지 개수를 한 번에 조회
+  // 3. 안 읽은 메시지 개수 조회
   const { data: unreadData } = await supabaseClient
     .from('messages')
     .select('room_id, read_by')
     .in('room_id', roomIds)
     .neq('sender_id', currentUserId);
 
-  // 안 읽은 개수 계산
   const unreadCountMap = {};
   for (const msg of unreadData || []) {
     const readBy = msg.read_by || [];
@@ -585,7 +584,7 @@ async function renderChats() {
     }
   }
 
-  // 4. 정렬: 고정된 방 우선, 그 다음 최신순
+  // 4. 정렬
   const sorted = [...chatRoomsList].sort((a, b) => {
     if (a.is_pinned && !b.is_pinned) return -1;
     if (!a.is_pinned && b.is_pinned) return 1;
@@ -602,7 +601,7 @@ async function renderChats() {
     return;
   }
 
-  // 5. 필터링된 방들의 마지막 메시지 내용 조회
+  // 5. 마지막 메시지 내용 조회
   const filteredRoomIds = filtered.map(r => r.id);
   const { data: lastMsgs } = await supabaseClient
     .from('messages')
@@ -636,6 +635,19 @@ async function renderChats() {
     const unreadCount = unreadCountMap[room.id] || 0;
     let avatarHtml = '';
     
+    // ✅ 1:1 채팅방 이름 표시 (상대방 이름으로)
+    let displayName = room.name || (room.is_group ? '단체방' : '대화');
+    
+    if (!room.is_group && room.members) {
+      const otherId = room.members.find(id => id !== currentUserId);
+      if (otherId) {
+        const otherUser = friendsList.find(f => f.id === otherId);
+        if (otherUser) {
+          displayName = otherUser.name;
+        }
+      }
+    }
+    
     if (!room.is_group) {
       const otherId = room.members?.find(id => id !== currentUserId);
       const other = friendsList.find(f => f.id === otherId);
@@ -664,7 +676,7 @@ async function renderChats() {
         ${avatarHtml}
         <div class="ci-info">
           <div class="ci-row1">
-            <span class="ci-name">${isPinned ? '📌 ' : ''}${room.name || (room.is_group ? '단체방' : '대화')}</span>
+            <span class="ci-name">${isPinned ? '📌 ' : ''}${displayName}</span>
             <span class="ci-time">${displayTime}</span>
           </div>
           <div class="ci-row2">
