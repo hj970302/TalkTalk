@@ -367,31 +367,27 @@ async function handleLogout() {
    친구 렌더링
    ============================================================ */
 function renderFriends() {
-  // renderFriendRequests(); 
+  renderFriendRequests(); 
   const container = document.getElementById('friends-list-container');
   if (!container) return;
-  
   const filtered = friendsList.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
   const favoriteFriends = filtered.filter(f => f.isFavorite);
-  const normalFriends = filtered.filter(f => !f.isFavorite);
+  const normalFriends   = filtered.filter(f => !f.isFavorite);
 
   let html = "";
-  
   if (favoriteFriends.length > 0) {
     html += `<div class="favorite-section"><div class="section-title">즐겨찾기 ${favoriteFriends.length}</div>`;
     html += favoriteFriends.map(f => makeFriendItemHTML(f)).join('');
     html += `</div>`;
   }
-  
   html += `<div class="normal-section"><div class="section-title">친구 ${normalFriends.length}</div>`;
-  
-  if (normalFriends.length === 0 && favoriteFriends.length === 0) {
+  if (normalFriends.length === 0 && favoriteFriends.length === 0)
     html += `<div class="empty-state"><p>등록된 친구가 없습니다.</p></div>`;
-  } else {
-    html += normalFriends.map(f => makeFriendItemHTML(f)).join('');
-  }
+  else html += normalFriends.map(f => makeFriendItemHTML(f)).join('');
   html += `</div>`;
 
+  const recs = renderRecommendSection();
+  if (recs) html += recs;
   container.innerHTML = html;
 }
 
@@ -1440,74 +1436,52 @@ async function addNewFriendWithVerify() {
   const input = document.getElementById('new-friend-id-input');
   const username = input?.value.trim();
   if (!username) return;
-  if (username === currentUserProfile?.username) { 
-    alert("자기 자신은 추가할 수 없습니다."); 
-    return; 
-  }
+  if (username === currentUserProfile?.username) { alert("자기 자신은 추가할 수 없습니다."); return; }
   
   const { data: profile } = await supabaseClient
     .from('profiles')
     .select('id, username, name, status, avatar')
     .eq('username', username)
+    .single();
+  
+  if (!profile) { alert("존재하지 않는 아이디입니다."); return; }
+  if (friendsList.some(f => f.id === profile.id)) { alert("이미 친구입니다."); return; }
+  
+  // 이미 요청 보냈는지 확인
+  const { data: existing } = await supabaseClient
+    .from('friend_requests')
+    .select('id, status')
+    .eq('from_user_id', currentUserId)
+    .eq('to_user_id', profile.id)
     .maybeSingle();
   
-  if (!profile) { 
-    alert("존재하지 않는 아이디입니다."); 
-    return; 
-  }
-  
-  // 최신 친구 목록 로드
-  await loadFriends();
-  
-  if (friendsList.some(f => f.id === profile.id)) {
-    showToast("알림", `${profile.name}님은 이미 친구입니다.`, "#888");
+  if (existing) {
+    if (existing.status === 'pending') alert("이미 친구 요청을 보냈습니다.");
+    else if (existing.status === 'accepted') alert("이미 친구입니다.");
     return;
   }
   
-  // 기존 친구 관계 삭제 (잔여 데이터 정리)
-  await supabaseClient
-    .from('friendships')
-    .delete()
-    .or(`and(user_id.eq.${currentUserId},friend_id.eq.${profile.id}),and(user_id.eq.${profile.id},friend_id.eq.${currentUserId})`);
+  // 친구 요청 보내기
+  await supabaseClient.from('friend_requests').insert({
+    from_user_id: currentUserId,
+    to_user_id: profile.id,
+    status: 'pending'
+  });
   
-  // 새 친구 관계 추가 (채팅방은 생성하지 않음!)
-  await supabaseClient.from('friendships').insert([
-    { user_id: currentUserId, friend_id: profile.id, status: 'accepted' },
-    { user_id: profile.id, friend_id: currentUserId, status: 'accepted' }
-  ]);
-  
-  // 친구 목록 다시 로드
-  await loadFriends();
-  renderFriends();
-  renderChats();
-  
-  showToast("친구 추가", `${profile.name}님과 친구가 되었습니다!`, "#2ed573");
+  showToast("친구 요청", `${profile.name}님에게 친구 요청을 보냈습니다.`, "#2ed573");
   input.value = '';
 }
 
 async function removeFriend(friendId) {
-  // 친구 관계 삭제
-  await supabaseClient
-    .from('friendships')
-    .delete()
-    .or(`and(user_id.eq.${currentUserId},friend_id.eq.${friendId}),and(user_id.eq.${friendId},friend_id.eq.${currentUserId})`);
-
-  // 친구 요청도 모두 삭제
-  await supabaseClient
-    .from('friend_requests')
-    .delete()
-    .or(`and(from_user_id.eq.${currentUserId},to_user_id.eq.${friendId}),and(from_user_id.eq.${friendId},to_user_id.eq.${currentUserId})`);
-
-  // 로컬 목록에서 제거
+  await supabaseClient.from('friendships').delete().eq('user_id', currentUserId).eq('friend_id', friendId);
+  // 차단 상태도 해제
+  if (blockedList.includes(friendId)) {
+    await supabaseClient.from('blocks').delete().eq('user_id', currentUserId).eq('blocked_id', friendId);
+    blockedList = blockedList.filter(id => id !== friendId);
+  }
   friendsList = friendsList.filter(f => f.id !== friendId);
-
-  // DB에서 다시 로드하여 동기화
-  await loadFriends();
-
-  renderFriends();
-  renderManageList();
-
-  showToast("친구 삭제", "친구 목록에서 제거되었습니다.", "#ff4757");
+  renderFriends(); renderManageList();
+  showToast("친구 삭제","친구 목록에서 제거되었습니다.","#ff4757");
 }
 
 /* ============================================================
