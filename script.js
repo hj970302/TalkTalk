@@ -1901,7 +1901,7 @@ function startGlobalRealtime() {
         }
         
         await loadChatRooms();
-        renderChats();
+        renderChats();  // 새 방 추가는 전체 렌더링 필요
         return;
       }
       
@@ -1912,7 +1912,9 @@ function startGlobalRealtime() {
       
       const sender = friendsList.find(f => f.id === msg.sender_id);
       showChatNotification(sender?.name || room?.name || '누군가', msg.content || '사진', sender?.avatar, msg.room_id);
-      await renderChats();
+      
+      // ✅ 전체 렌더링 대신 해당 방만 업데이트
+      await renderChats(msg.room_id);
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async (payload) => {
       const updatedProfile = payload.new;
@@ -1954,14 +1956,17 @@ function startGlobalRealtime() {
         );
         if (targetRoom) {
           targetRoom.name = updatedProfile.name;
-          renderChats();
+          // ✅ 프로필 변경으로 인한 채팅방 이름 업데이트는 해당 방만 갱신
+          renderChats(targetRoom.id);
         }
 
         if (changed) showToast("프로필 변경", `${updatedProfile.name}님의 프로필이 업데이트되었습니다.`, "#5352ed");
       }
     })
     .subscribe();
-}/* ============================================================
+}
+
+/* ============================================================
    폰트 설정
    ============================================================ */
 function openFontModal() {
