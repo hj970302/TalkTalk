@@ -1000,7 +1000,7 @@ function appendMessageToUI(msg) {
       nameEl.className = 'msg-sender-name';
       nameEl.textContent = senderName;
       const bubble = makeBubbleEl(msg, isMine);
-      const meta = makeMetaEl();
+      const meta = makeMetaEl(msg.created_at);
       bwrap.appendChild(nameEl);
       bwrap.appendChild(bubble);
       bwrap.appendChild(meta);
@@ -1014,7 +1014,7 @@ function appendMessageToUI(msg) {
   const bwrap = document.createElement('div');
   bwrap.className = 'bwrap';
   const bubble = makeBubbleEl(msg, isMine);
-  const meta = makeMetaEl();
+  const meta = makeMetaEl(msg.created_at);
   bwrap.appendChild(bubble);
   bwrap.appendChild(meta);
   row.appendChild(bwrap);
@@ -1085,10 +1085,21 @@ function makeBubbleEl(msg, isMine) {
   return bubble;
 }
 
-function makeMetaEl() {
+function makeMetaEl(createdAt) {
   const meta = document.createElement('div');
   meta.className = 'bmeta';
-  meta.innerHTML = `<span>${timeNow()}</span>`;
+  
+  // 메시지 생성 시간 포맷
+  if (createdAt) {
+    const d = new Date(createdAt);
+    const h = d.getHours();
+    const m = String(d.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? '오후' : '오전';
+    const hour = h % 12 || 12;
+    meta.innerHTML = `<span>${ampm} ${hour}:${m}</span>`;
+  } else {
+    meta.innerHTML = `<span>${timeNow()}</span>`;
+  }
   return meta;
 }
 
