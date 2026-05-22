@@ -392,22 +392,33 @@ function renderFriends() {
 }
 
 function renderRecommendSection() {
-  if (!window._allProfiles || window._allProfiles.length === 0) return '';
-  const friendIds = new Set(friendsList.map(f => f.id));
-  const recommends = window._allProfiles.filter(p => p.id !== currentUserId && !friendIds.has(p.id));
-  if (recommends.length === 0) return '';
-  let html = `<div class="normal-section"><div class="section-title" style="color:#888;">추천 친구 ${recommends.length}</div>`;
-  html += recommends.map(p => `
-    <div class="friend-item" style="opacity:0.75;">
-      <div class="avatar-sm avatar-base">${p.avatar ? `<div style="width:100%;height:100%;background:url('${p.avatar}') center/cover;border-radius:50%;"></div>` : '<i class="ti ti-user"></i>'}</div>
-      <div style="flex:1;"><div class="fi-name">${p.name}</div><div class="fi-status">${p.status||''}</div></div>
-      <button onclick="quickAddFriend('${p.id}','${p.username}','${p.name}')" style="background:#fee500;border:none;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;">추가</button>
-    </div>
-  `).join('');
+  // ✅ friendRequests에서 아직 응답하지 않은 요청만 가져오기
+  const pendingRequests = friendRequests.filter(req => req.status === 'pending');
+  
+  if (pendingRequests.length === 0) return '';
+  
+  let html = `<div class="normal-section"><div class="section-title" style="color:#888;">📨 받은 친구 요청 ${pendingRequests.length}</div>`;
+  html += pendingRequests.map(req => {
+    const fromUser = req.from;
+    if (!fromUser) return '';
+    
+    return `
+      <div class="friend-item" style="opacity:0.75;">
+        <div class="avatar-sm avatar-base">${fromUser.avatar ? `<div style="width:100%;height:100%;background:url('${fromUser.avatar}') center/cover;border-radius:50%;"></div>` : '<i class="ti ti-user"></i>'}</div>
+        <div style="flex:1;">
+          <div class="fi-name">${fromUser.name}</div>
+          <div class="fi-status">${fromUser.status || ''}</div>
+        </div>
+        <div style="display: flex; gap: 6px;">
+          <button onclick="respondToFriendRequest('${req.id}', 'accept')" style="background:#2ed573; border:none; border-radius:8px; padding:5px 10px; font-size:12px; font-weight:700; color:white; cursor:pointer;">✅ 수락</button>
+          <button onclick="respondToFriendRequest('${req.id}', 'reject')" style="background:#ff4757; border:none; border-radius:8px; padding:5px 10px; font-size:12px; font-weight:700; color:white; cursor:pointer;">❌ 거절</button>
+        </div>
+      </div>
+    `;
+  }).join('');
   html += `</div>`;
   return html;
 }
-
 async function quickAddFriend(friendId, friendUsername, friendName) {
   if (friendsList.some(f => f.id === friendId)) { showToast("알림","이미 친구입니다.","#888"); return; }
   await supabaseClient.from('friendships').insert({ user_id: currentUserId, friend_id: friendId, status: 'accepted' });
