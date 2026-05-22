@@ -366,30 +366,32 @@ async function handleLogout() {
 /* ============================================================
    친구 렌더링
    ============================================================ */
-ffunction renderFriends() {
+function renderFriends() {
   renderFriendRequests(); 
   const container = document.getElementById('friends-list-container');
   if (!container) return;
+  
   const filtered = friendsList.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()));
   const favoriteFriends = filtered.filter(f => f.isFavorite);
-  const normalFriends   = filtered.filter(f => !f.isFavorite);
+  const normalFriends = filtered.filter(f => !f.isFavorite);
 
   let html = "";
+  
   if (favoriteFriends.length > 0) {
     html += `<div class="favorite-section"><div class="section-title">즐겨찾기 ${favoriteFriends.length}</div>`;
     html += favoriteFriends.map(f => makeFriendItemHTML(f)).join('');
     html += `</div>`;
   }
+  
   html += `<div class="normal-section"><div class="section-title">친구 ${normalFriends.length}</div>`;
-  if (normalFriends.length === 0 && favoriteFriends.length === 0)
+  
+  if (normalFriends.length === 0 && favoriteFriends.length === 0) {
     html += `<div class="empty-state"><p>등록된 친구가 없습니다.</p></div>`;
-  else html += normalFriends.map(f => makeFriendItemHTML(f)).join('');
+  } else {
+    html += normalFriends.map(f => makeFriendItemHTML(f)).join('');
+  }
   html += `</div>`;
 
-  // ❌ 추천 친구 섹션 제거
-  // const recs = renderRecommendSection();
-  // if (recs) html += recs;
-  
   container.innerHTML = html;
 }
 
