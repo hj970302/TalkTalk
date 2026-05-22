@@ -1446,28 +1446,70 @@ async function addNewFriendWithVerify() {
     .from('profiles')
     .select('id, username, name, status, avatar')
     .eq('username', username)
-    .single();
+    .maybeSingle();
   
   if (!profile) { alert("존재하지 않는 아이디입니다."); return; }
-  if (friendsList.some(f => f.id === profile.id)) { alert("이미 친구입니다."); return; }
   
-  // ✅ 바로 친구 관계 추가 (양방향)
+  // ✅ 이미 친구인지 확인 (양방향)
+  const { data: existingFriendship } = await supabaseClient
+    .from('friendships')
+    .select('id')
+    .or(`and(user_id.eq.${currentUserId},friend_id.eq.${profile.id}),and(user_id.eq.${profile.id},friend_id.eq.${currentUserId})`)
+    .maybeSingle();
+  
+  if (existingFriendship) {
+    // 이미 친구면 목록 새로고침 후 종료
+    await loadFriends();
+    renderFriends();
+    alert("이미 친구입니다.");
+    input.value = '';
+    return;
+  }
+  
+  // ✅ 새로운 친구 관계 추가 (양방향)
   await supabaseClient.from('friendships').insert([
     { user_id: currentUserId, friend_id: profile.id, status: 'accepted' },
     { user_id: profile.id, friend_id: currentUserId, status: 'accepted' }
   ]);
   
-  // ✅ 1:1 채팅방 생성
-  const { data: room } = await supabaseClient
-    .from('chat_rooms')
-    .insert({ name: profile.name, is_group: false, created_by: currentUserId })
-    .select()
-    .single();
+  // ✅ 1:1 채팅방 확인 (없으면 생성)
+  const { data: myRooms } = await supabaseClient
+    .from('chat_room_members')
+    .select('room_id')
+    .eq('user_id', currentUserId);
   
-  await supabaseClient.from('chat_room_members').insert([
-    { room_id: room.id, user_id: currentUserId },
-    { room_id: room.id, user_id: profile.id }
-  ]);
+  const myRoomIds = myRooms?.map(r => r.room_id) || [];
+  let room = null;
+  
+  if (myRoomIds.length > 0) {
+    const { data: sharedRooms } = await supabaseClient
+      .from('chat_room_members')
+      .select('room_id')
+      .eq('user_id', profile.id)
+      .in('room_id', myRoomIds);
+    
+    if (sharedRooms && sharedRooms.length > 0) {
+      const { data: roomData } = await supabaseClient
+        .from('chat_rooms')
+        .select('*')
+        .eq('id', sharedRooms[0].room_id)
+        .single();
+      room = roomData;
+    }
+  }
+  
+  if (!room) {
+    const { data: newRoom } = await supabaseClient
+      .from('chat_rooms')
+      .insert({ name: profile.name, is_group: false, created_by: currentUserId })
+      .select()
+      .single();
+    room = newRoom;
+    await supabaseClient.from('chat_room_members').insert([
+      { room_id: room.id, user_id: currentUserId },
+      { room_id: room.id, user_id: profile.id }
+    ]);
+  }
   
   // ✅ 친구 목록 새로고침
   await loadFriends();
