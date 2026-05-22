@@ -546,12 +546,22 @@ document.addEventListener('mousedown', e => {
    ============================================================ */
 let isRenderingChats = false;
 
-async function renderChats() {
+async function renderChats(roomId = null) {
   if (isRenderingChats) return;
   isRenderingChats = true;
 
   const container = document.getElementById('chats-list-container');
   if (!container) { isRenderingChats = false; return; }
+
+  // ✅ 특정 방만 업데이트 (메시지 수신 시)
+  if (roomId) {
+    const targetRoom = chatRoomsList.find(r => r.id === roomId);
+    if (targetRoom) {
+      await updateSingleChatItem(targetRoom);
+      isRenderingChats = false;
+      return;
+    }
+  }
 
   // 1. 모든 채팅방의 마지막 메시지 시간 조회
   const roomIds = chatRoomsList.map(r => r.id);
@@ -690,6 +700,109 @@ async function renderChats() {
     attachSwipeToItem(wrapper);
   }
   isRenderingChats = false;
+}
+
+// ============================================================
+// 단일 채팅방 업데이트 (선택적 렌더링용)
+// ============================================================
+
+async function updateSingleChatItem(room) {
+  const container = document.getElementById('chats-list-container');
+  if (!container) return;
+  
+  // 마지막 메시지 조회
+  const { data: lastMsg } = await supabaseClient
+    .from('messages')
+    .select('content, type, created_at')
+    .eq('room_id', room.id)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  
+  const lastChat = lastMsg?.[0];
+  let displayMsg = lastChat ? (lastChat.type === 'image' ? '📸 사진' : (lastChat.content?.substring(0, 30) || '')) : '대화 내역 없음';
+  let displayTime = '';
+  if (lastChat?.created_at) {
+    const d = new Date(lastChat.created_at);
+    const h = d.getHours();
+    const m = String(d.getMinutes()).padStart(2, '0');
+    displayTime = `${h >= 12 ? '오후' : '오전'} ${h % 12 || 12}:${m}`;
+  }
+  
+  // 안 읽은 메시지 개수
+  const { count: unreadCount } = await supabaseClient
+    .from('messages')
+    .select('*', { count: 'exact', head: true })
+    .eq('room_id', room.id)
+    .neq('sender_id', currentUserId)
+    .not('read_by', 'cs', `{${currentUserId}}`);
+  
+  const unreadNum = unreadCount || 0;
+  
+  // 채팅방 이름 표시
+  let displayName = room.name || (room.is_group ? '단체방' : '대화');
+  if (!room.is_group && room.members) {
+    const otherId = room.members.find(id => id !== currentUserId);
+    if (otherId) {
+      const otherUser = friendsList.find(f => f.id === otherId);
+      if (otherUser) displayName = otherUser.name;
+    }
+  }
+  
+  // 아바타
+  let avatarHtml = '';
+  if (!room.is_group) {
+    const otherId = room.members?.find(id => id !== currentUserId);
+    const other = friendsList.find(f => f.id === otherId);
+    if (other?.avatar) {
+      avatarHtml = `<div class="chat-avatar avatar-base" style="background-image:url('${other.avatar}'); background-size:cover; background-position:center;"></div>`;
+    } else {
+      avatarHtml = `<div class="chat-avatar avatar-base"><i class="ti ti-user"></i></div>`;
+    }
+  } else {
+    avatarHtml = `<div class="chat-avatar avatar-base"><i class="ti ti-users"></i></div>`;
+  }
+  
+  const isPinned = room.is_pinned || false;
+  
+  const newHtml = `
+    <div class="chat-swipe-actions">
+      <button class="swa-btn swa-pin" onclick="chatSwipeAction('pin','${room.id}')">
+        <i class="ti ${isPinned ? 'ti-pin-filled' : 'ti-pin'}"></i><span>${isPinned ? '해제' : '고정'}</span>
+      </button>
+      <button class="swa-btn swa-leave" onclick="chatSwipeAction('leave','${room.id}')">
+        <i class="ti ti-door-exit"></i><span>나가기</span>
+      </button>
+    </div>
+    <div class="chat-item${isPinned ? ' pinned' : ''}" onclick="openRoomFromData('${room.id}')">
+      ${avatarHtml}
+      <div class="ci-info">
+        <div class="ci-row1">
+          <span class="ci-name">${isPinned ? '📌 ' : ''}${displayName}</span>
+          <span class="ci-time">${displayTime}</span>
+        </div>
+        <div class="ci-row2">
+          <span class="ci-preview">${displayMsg}</span>
+          ${unreadNum > 0 ? `<span class="unread-badge">${unreadNum}</span>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const existingWrapper = container.querySelector(`.chat-item-wrapper[data-id="${room.id}"]`);
+  
+  if (existingWrapper) {
+    // 기존 요소 업데이트
+    existingWrapper.innerHTML = newHtml;
+    attachSwipeToItem(existingWrapper);
+  } else {
+    // 새로 추가
+    const wrapper = document.createElement('div');
+    wrapper.className = 'chat-item-wrapper';
+    wrapper.setAttribute('data-id', room.id);
+    wrapper.innerHTML = newHtml;
+    container.appendChild(wrapper);
+    attachSwipeToItem(wrapper);
+  }
 }
 
 async function chatSwipeAction(action, roomId) {
