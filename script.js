@@ -366,7 +366,7 @@ async function handleLogout() {
 /* ============================================================
    친구 렌더링
    ============================================================ */
-function renderFriends() {
+ffunction renderFriends() {
   renderFriendRequests(); 
   const container = document.getElementById('friends-list-container');
   if (!container) return;
@@ -386,8 +386,10 @@ function renderFriends() {
   else html += normalFriends.map(f => makeFriendItemHTML(f)).join('');
   html += `</div>`;
 
-  const recs = renderRecommendSection();
-  if (recs) html += recs;
+  // ❌ 추천 친구 섹션 제거
+  // const recs = renderRecommendSection();
+  // if (recs) html += recs;
+  
   container.innerHTML = html;
 }
 
