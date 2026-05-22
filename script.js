@@ -1108,12 +1108,9 @@ async function sendPushNotification(text) {
     const player_ids = profiles?.map(p => p.onesignal_player_id).filter(Boolean) || [];
     if (player_ids.length === 0) return;
 
-    await fetch('https://yrndqghsdtxoajgxvqrv.supabase.co/functions/v1/send-notification', {
+    await fetch('https://talk-talk-phi.vercel.app/api/notify', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         player_ids,
         title: currentUserProfile?.name || '톡톡',
