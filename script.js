@@ -1112,7 +1112,7 @@ async function sendPushNotification(text) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Basic fa3e79db-55b2-4d23-b315-c0f131287f7e'
+        'Authorization': 'Basic'
       },
       body: JSON.stringify({
         app_id: 'fa3e79db-55b2-4d23-b315-c0f131287f7e',
