@@ -87,6 +87,12 @@ function showToast(title, message, color='#333') {
   setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 200); }, 2500);
 }
 function showChatNotification(name, text, avatarUrl, roomId) {
+  // ✅ 앱이 활성화되어 있으면 토스트 알림 표시 안 함
+  if (isAppActive) {
+    console.log('앱 활성화 상태 - 토스트 알림 생략');
+    return;
+  }
+  
   const tc = document.getElementById('toast-container');
   if (!tc) return;
   const t = document.createElement('div');
@@ -102,6 +108,7 @@ function showChatNotification(name, text, avatarUrl, roomId) {
   tc.appendChild(t);
   setTimeout(() => { if (t.parentNode) { t.classList.add('hiding'); setTimeout(() => t.remove(), 200); } }, 3500);
 }
+
 function applyAvatarStyle(element, imgUrl) {
   if (!element) return;
   if (imgUrl) {
