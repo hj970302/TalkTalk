@@ -1451,28 +1451,30 @@ async function addNewFriendWithVerify() {
   if (!profile) { alert("존재하지 않는 아이디입니다."); return; }
   if (friendsList.some(f => f.id === profile.id)) { alert("이미 친구입니다."); return; }
   
-  // 이미 요청 보냈는지 확인
-  const { data: existing } = await supabaseClient
-    .from('friend_requests')
-    .select('id, status')
-    .eq('from_user_id', currentUserId)
-    .eq('to_user_id', profile.id)
-    .maybeSingle();
+  // ✅ 바로 친구 관계 추가 (양방향)
+  await supabaseClient.from('friendships').insert([
+    { user_id: currentUserId, friend_id: profile.id, status: 'accepted' },
+    { user_id: profile.id, friend_id: currentUserId, status: 'accepted' }
+  ]);
   
-  if (existing) {
-    if (existing.status === 'pending') alert("이미 친구 요청을 보냈습니다.");
-    else if (existing.status === 'accepted') alert("이미 친구입니다.");
-    return;
-  }
+  // ✅ 1:1 채팅방 생성
+  const { data: room } = await supabaseClient
+    .from('chat_rooms')
+    .insert({ name: profile.name, is_group: false, created_by: currentUserId })
+    .select()
+    .single();
   
-  // 친구 요청 보내기
-  await supabaseClient.from('friend_requests').insert({
-    from_user_id: currentUserId,
-    to_user_id: profile.id,
-    status: 'pending'
-  });
+  await supabaseClient.from('chat_room_members').insert([
+    { room_id: room.id, user_id: currentUserId },
+    { room_id: room.id, user_id: profile.id }
+  ]);
   
-  showToast("친구 요청", `${profile.name}님에게 친구 요청을 보냈습니다.`, "#2ed573");
+  // ✅ 친구 목록 새로고침
+  await loadFriends();
+  renderFriends();
+  renderChats();
+  
+  showToast("친구 추가", `${profile.name}님과 친구가 되었습니다!`, "#2ed573");
   input.value = '';
 }
 
