@@ -1456,10 +1456,9 @@ async function addNewFriendWithVerify() {
     return; 
   }
   
-  // ✅ 중요: 먼저 최신 친구 목록 로드
+  // ✅ 최신 친구 목록 로드
   await loadFriends();
   
-  // ✅ 최신 목록으로 체크
   if (friendsList.some(f => f.id === profile.id)) {
     showToast("알림", `${profile.name}님은 이미 친구입니다.`, "#888");
     return;
@@ -1471,57 +1470,25 @@ async function addNewFriendWithVerify() {
     .delete()
     .or(`and(user_id.eq.${currentUserId},friend_id.eq.${profile.id}),and(user_id.eq.${profile.id},friend_id.eq.${currentUserId})`);
   
-  // ✅ 새로 추가
+  // ✅ 새 친구 관계 추가
   await supabaseClient.from('friendships').insert([
     { user_id: currentUserId, friend_id: profile.id, status: 'accepted' },
     { user_id: profile.id, friend_id: currentUserId, status: 'accepted' }
   ]);
   
-  // ✅ 채팅방 확인/생성
-  const { data: myRooms } = await supabaseClient
-    .from('chat_room_members')
-    .select('room_id')
-    .eq('user_id', currentUserId);
+  // ❌ ========== 여기서부터 아래 채팅방 생성 코드 전부 삭제 ==========
+  // 
+  // const { data: myRooms } = ... (삭제)
+  // let room = ... (삭제)
+  // if (!room) { ... } (삭제)
+  // chatRoomsList.push(room) (삭제)
+  //
+  // ❌ ========== 삭제 끝 ==========
   
-  const myRoomIds = myRooms?.map(r => r.room_id) || [];
-  let room = null;
-  
-  if (myRoomIds.length > 0) {
-    const { data: sharedRooms } = await supabaseClient
-      .from('chat_room_members')
-      .select('room_id')
-      .eq('user_id', profile.id)
-      .in('room_id', myRoomIds);
-    
-    if (sharedRooms && sharedRooms.length > 0) {
-      const { data: roomData } = await supabaseClient
-        .from('chat_rooms')
-        .select('*')
-        .eq('id', sharedRooms[0].room_id)
-        .single();
-      room = roomData;
-    }
-  }
-  
-  if (!room) {
-    const { data: newRoom } = await supabaseClient
-      .from('chat_rooms')
-      .insert({ name: profile.name, is_group: false, created_by: currentUserId })
-      .select()
-      .single();
-    room = newRoom;
-    if (room) {
-      await supabaseClient.from('chat_room_members').insert([
-        { room_id: room.id, user_id: currentUserId },
-        { room_id: room.id, user_id: profile.id }
-      ]);
-    }
-  }
-  
-  // ✅ 최종 친구 목록 다시 로드
+  // ✅ 친구 목록 다시 로드
   await loadFriends();
   renderFriends();
-  renderChats();
+  renderChats();  // 채팅방 목록도 다시 로드 (기존 채팅방만 표시됨)
   
   showToast("친구 추가", `${profile.name}님과 친구가 되었습니다!`, "#2ed573");
   input.value = '';
