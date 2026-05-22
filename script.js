@@ -1105,26 +1105,16 @@ async function sendPushNotification(text) {
       .select('onesignal_player_id')
       .in('id', otherIds);
 
-    const playerIds = profiles?.map(p => p.onesignal_player_id).filter(Boolean) || [];
-    if (playerIds.length === 0) return;
+    const player_ids = profiles?.map(p => p.onesignal_player_id).filter(Boolean) || [];
+    if (player_ids.length === 0) return;
 
-    const response = await fetch('https://onesignal.com/api/v1/notifications', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Basic'
-      },
-      body: JSON.stringify({
-        app_id: 'fa3e79db-55b2-4d23-b315-c0f131287f7e',
-        include_player_ids: playerIds,
-        headings: { en: currentUserProfile?.name || '톡톡' },
-        contents: { en: text.length > 50 ? text.substring(0, 50) + '...' : text },
-        data: { roomId: currentRoom.id, type: 'new_message' }
-      })
+    await supabaseClient.functions.invoke('send-notification', {
+      body: {
+        player_ids,
+        title: currentUserProfile?.name || '톡톡',
+        message: text.length > 50 ? text.substring(0, 50) + '...' : text,
+      }
     });
-
-    const result = await response.json();
-    console.log('알림 전송 결과:', result);
   } catch(e) {
     console.error('알림 전송 실패:', e);
   }
