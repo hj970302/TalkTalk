@@ -819,25 +819,35 @@ async function chatSwipeAction(action, roomId) {
   } else if (action === 'leave') {
     if (!confirm("채팅방에서 나가시겠습니까? 나가면 대화 내용이 삭제됩니다.")) return;
     
-    // ✅ 멤버 삭제하지 않음! (채팅방 재입장을 위해 DB 멤버는 유지)
+    // ✅ 1. DB에서 채팅방 멤버 삭제 (이게 핵심!)
+    await supabaseClient
+      .from('chat_room_members')
+      .delete()
+      .eq('room_id', roomId)
+      .eq('user_id', currentUserId);
     
-    // 1. 모든 메시지에 내 ID를 deleted_for_me 배열에 추가 (병렬 처리로 속도 개선)
-    const { data: messages } = await supabaseClient
-      .from('messages')
-      .select('id, deleted_for_me')
+    // ✅ 2. 방에 아무도 없으면 방 자체도 삭제
+    const { count } = await supabaseClient
+      .from('chat_room_members')
+      .select('*', { count: 'exact', head: true })
       .eq('room_id', roomId);
     
-    // ✅ 병렬로 모든 업데이트 실행
-    const updatePromises = (messages || []).map(async (msg) => {
-      const currentDeleted = msg.deleted_for_me || [];
-      if (!currentDeleted.includes(currentUserId)) {
-        return supabaseClient
-          .from('messages')
-          .update({ deleted_for_me: [...currentDeleted, currentUserId] })
-          .eq('id', msg.id);
-      }
-      return null;
-    });
+    if (count === 0) {
+      await supabaseClient.from('chat_rooms').delete().eq('id', roomId);
+    }
+    
+    // ✅ 3. UI에서 제거
+    chatRoomsList = chatRoomsList.filter(r => r.id !== roomId);
+    
+    // ✅ 4. 현재 채팅방 열려있으면 닫기
+    if (roomOpen && currentRoom.id === roomId) {
+      closeRoom();
+    }
+    
+    renderChats();
+    showToast("채팅방", "채팅방에서 나갔습니다.", "#ff4757");
+  }
+}
     
     await Promise.all(updatePromises.filter(Boolean));
     
