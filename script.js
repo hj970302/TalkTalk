@@ -85,22 +85,40 @@ function showToast(title, message, color='#333') {
   tc.appendChild(t);
   setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 200); }, 2500);
 }
+
+
 function showChatNotification(name, text, avatarUrl, roomId) {
   const tc = document.getElementById('toast-container');
   if (!tc) return;
+  
+  // ✅ 앱에서 채팅방이 열려있고, 그 방의 메시지면 알림 안 띄움
+  if (roomOpen && currentRoom.id === roomId) return;
+  
   const t = document.createElement('div');
   t.className = 'toast';
   const avStyle = avatarUrl ? `style="background-image:url('${avatarUrl}'); background-size:cover; background-position:center;"` : '';
   t.innerHTML = `<div class="toast-avatar avatar-base" ${avStyle}>${avatarUrl?'':'<i class="ti ti-user"></i>'}</div>
-                 <div class="toast-body"><div class="toast-name">${name}</div><div class="toast-msg">${text}</div></div>`;
+                 <div class="toast-body"><div class="toast-name">${escapeHtml(name)}</div><div class="toast-msg">${escapeHtml(text)}</div></div>`;
   t.onclick = () => {
-    // ✅ roomId로 직접 채팅방 열기 (이름으로 찾지 않음)
     if (roomId) openRoomFromData(roomId);
     t.remove();
   };
   tc.appendChild(t);
   setTimeout(() => { if (t.parentNode) { t.classList.add('hiding'); setTimeout(() => t.remove(), 200); } }, 3500);
 }
+
+// XSS 방지 헬퍼 함수 (함수 위에 추가)
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/[&<>]/g, function(m) {
+    if (m === '&') return '&amp;';
+    if (m === '<') return '&lt;';
+    if (m === '>') return '&gt;';
+    return m;
+  });
+}
+
+
 function applyAvatarStyle(element, imgUrl) {
   if (!element) return;
   if (imgUrl) {
@@ -1864,13 +1882,19 @@ function startGlobalRealtime() {
     .channel('global-realtime')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
       const msg = payload.new;
+      
+      // ✅ 내가 보낸 메시지는 무시
       if (msg.sender_id === currentUserId) return;
+      
+      // ✅ 차단한 사람의 메시지는 무시
       if (blockedList.includes(msg.sender_id)) return;
+      
+      // ✅ 현재 채팅방이 열려있고, 그 방의 메시지면 알림 안 보냄 (이미 보고 있음)
+      if (roomOpen && currentRoom.id === msg.room_id) return;
       
       const myRoomIds = chatRoomsList.map(r => r.id);
       
       if (!myRoomIds.includes(msg.room_id)) {
-        // ✅ 중복 삽입 방지
         const { data: existing } = await supabaseClient
           .from('chat_room_members')
           .select('room_id')
@@ -1886,22 +1910,25 @@ function startGlobalRealtime() {
         }
         
         await loadChatRooms();
-        renderChats();  // 새 방 추가는 전체 렌더링 필요
+        renderChats();
         return;
       }
-      
-      if (roomOpen && currentRoom.id === msg.room_id) return;
       
       const room = chatRoomsList.find(r => r.id === msg.room_id);
       if (room?.is_muted) return;
       
       const sender = friendsList.find(f => f.id === msg.sender_id);
+      
+      // ✅ 차단한 사람이면 알림 표시하지 않음 (한 번 더 체크)
+      if (blockedList.includes(msg.sender_id)) return;
+      
+      // ✅ 여기서만 알림 표시 (위에서 이미 필터링됨)
       showChatNotification(sender?.name || room?.name || '누군가', msg.content || '사진', sender?.avatar, msg.room_id);
       
-      // ✅ 전체 렌더링 대신 해당 방만 업데이트
       await renderChats(msg.room_id);
     })
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, async (payload) => {
+      // ... 기존 코드 유지
       const updatedProfile = payload.new;
       
       const friendIndex = friendsList.findIndex(f => f.id === updatedProfile.id);
@@ -1941,7 +1968,6 @@ function startGlobalRealtime() {
         );
         if (targetRoom) {
           targetRoom.name = updatedProfile.name;
-          // ✅ 프로필 변경으로 인한 채팅방 이름 업데이트는 해당 방만 갱신
           renderChats(targetRoom.id);
         }
 
