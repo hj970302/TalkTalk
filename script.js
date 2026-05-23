@@ -640,13 +640,17 @@ unreadCountMap[msg.room_id] = (unreadCountMap[msg.room_id] || 0) + 1;
 }
 }
 
-// 4. 정렬
+// 4. 정렬 (수정된 부분 ⬇️)
 const sorted = [...chatRoomsList].sort((a, b) => {
-if (a.is_pinned && !b.is_pinned) return -1;
-if (!a.is_pinned && b.is_pinned) return 1;
-const timeA = lastTimeMap[a.id] || a.created_at || 0;
-const timeB = lastTimeMap[b.id] || b.created_at || 0;
-return new Date(timeB) - new Date(timeA);
+  // 1순위: 고정된 방
+  if (a.is_pinned && !b.is_pinned) return -1;
+  if (!a.is_pinned && b.is_pinned) return 1;
+  
+  // 2순위: 최근 메시지 시간 기준
+  const timeA = lastTimeMap[a.id] ? new Date(lastTimeMap[a.id]) : new Date(0);
+  const timeB = lastTimeMap[b.id] ? new Date(lastTimeMap[b.id]) : new Date(0);
+  
+  return timeB - timeA;  // 내림차순 (최신순)
 });
 
 const filtered = sorted.filter(c => c.name?.toLowerCase().includes(chatSearchQuery.toLowerCase()));
