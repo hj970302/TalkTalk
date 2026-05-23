@@ -186,29 +186,6 @@ async function initApp() {
     toggleAuthForm('login');
   }, 1500);
 }
-
-currentUserId = session.user.id;
-if (authScreen) authScreen.style.display = 'none';
-await loadUserData(session.user.id);
-showToast("환영합니다", `${currentUserProfile?.name || '사용자'}님, 자동 로그인되었습니다.`, "#fee500");
-return;
-}
-} catch(e) {
-console.log('세션 복원 오류:', e);
-}
-}
-
-// 로그인 안 된 경우에만 스플래시 표시
-if (authScreen) {
-authScreen.style.display = 'flex';
-if (splashLogo) splashLogo.style.display = 'flex';
-}
-setTimeout(() => {
-if (splashLogo) splashLogo.style.display = 'none';
-toggleAuthForm('login');
-}, 1500);
-}
-
 async function loadUserData(userId) {
 const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', userId).single();
 if (profile) { currentUserProfile = profile; syncMyProfileDOM(); }
