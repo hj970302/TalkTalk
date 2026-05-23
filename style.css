@@ -915,9 +915,9 @@ html, body {
   100% { box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #c44569; }
 }
 
-/* 탭바 아이콘 (헬로키티 스타일 - 리본/고양이 이미지) */
+/* 탭바 아이콘 (헬로키티 스타일) */
 [data-theme="hellokitty"] #tab-friends i {
-  background-image: url('https://cdn-icons-png.flaticon.com/512/1218/1218643.png') !important;
+  background-image: url('https://yrndqghsdtxoajgxvqrv.supabase.co/storage/v1/object/public/chat-images/HK-1.png') !important;
   background-size: contain !important;
   background-repeat: no-repeat !important;
   background-position: center !important;
@@ -929,7 +929,7 @@ html, body {
 [data-theme="hellokitty"] #tab-friends i::before { content: "" !important; display: none; }
 
 [data-theme="hellokitty"] #tab-chats i {
-  background-image: url('https://cdn-icons-png.flaticon.com/512/1218/1218645.png') !important;
+  background-image: url('https://yrndqghsdtxoajgxvqrv.supabase.co/storage/v1/object/public/chat-images/HK-2.png') !important;
   background-size: contain !important;
   background-repeat: no-repeat !important;
   background-position: center !important;
@@ -941,7 +941,7 @@ html, body {
 [data-theme="hellokitty"] #tab-chats i::before { content: "" !important; display: none; }
 
 [data-theme="hellokitty"] #tab-more i {
-  background-image: url('https://cdn-icons-png.flaticon.com/512/1218/1218646.png') !important;
+  background-image: url('https://yrndqghsdtxoajgxvqrv.supabase.co/storage/v1/object/public/chat-images/HK-3.png') !important;
   background-size: contain !important;
   background-repeat: no-repeat !important;
   background-position: center !important;
