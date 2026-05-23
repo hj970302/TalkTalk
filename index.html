@@ -170,16 +170,28 @@
     </div>
   </div>
 
-  <!-- 관리자 밴 모달 -->
-  <div class="modal-overlay" id="admin-ban-modal">
-    <div class="modal-content">
-      <h3>🛡️ 관리자 기능 - 유저 관리</h3>
-      <div class="manage-list" id="admin-ban-list" style="max-height:200px;"></div>
-      <div class="modal-btns">
-        <button class="btn-cancel" onclick="closeAdminBanModal()">닫기</button>
+<!-- 관리자 밴 모달 -->
+<div class="modal-overlay" id="admin-ban-modal">
+  <div class="modal-content">
+    <h3>🛡️ 관리자 기능 - 유저 관리</h3>
+    
+    <!-- 👇 여기에 신규 가입 제한 토글 버튼 추가 -->
+    <div style="margin-bottom: 15px; padding: 12px; background: var(--bg2); border-radius: 10px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size:14px; font-weight:600;">
+          <i class="ti ti-lock"></i> 신규 계정 가입 제한
+        </span>
+        <button id="toggle-signup-lock-btn" onclick="toggleSignupLock()" style="padding:6px 12px; border:none; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer;"></button>
       </div>
+      <div style="font-size: 11px; color: var(--text3); margin-top: 8px;" id="signup-lock-status"></div>
+    </div>
+    
+    <div class="manage-list" id="admin-ban-list" style="max-height:200px;"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeAdminBanModal()">닫기</button>
     </div>
   </div>
+</div>
 
   <!-- 폰트 설정 모달 -->
   <div class="modal-overlay font-modal" id="font-modal">
