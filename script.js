@@ -2288,7 +2288,8 @@ await supabaseClient
 .eq('id', msg.id);
 }
 }
-
+renderChats(); // 목록 새로고침
+}
 function appendMessageToUI(msg) {
   const container = document.getElementById('room-messages');
   if (!container) return;
@@ -2346,7 +2347,4 @@ function appendMessageToUI(msg) {
   row.appendChild(bwrap);
   container.appendChild(row);
   container.scrollTop = container.scrollHeight;
-}
-
-renderChats(); // 목록 새로고침
 }
