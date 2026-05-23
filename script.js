@@ -2289,5 +2289,64 @@ await supabaseClient
 }
 }
 
+function appendMessageToUI(msg) {
+  const container = document.getElementById('room-messages');
+  if (!container) return;
+  if (msg.id && container.querySelector(`[data-msg-id="${msg.id}"]`)) return;
+
+  const isMine = msg.sender_id === currentUserId;
+  const row = document.createElement('div');
+  row.className = `msg-row ${isMine ? 'mine' : 'other'}`;
+  if (msg.id) row.setAttribute('data-msg-id', msg.id);
+
+  // 상대방 아바타
+  if (!isMine) {
+    const profiles = window._roomMemberProfiles || [];
+    const senderProfile = profiles.find(p => p.id === msg.sender_id);
+    const senderFriend = friendsList.find(f => f.id === msg.sender_id);
+    const senderAv = senderProfile?.avatar || senderFriend?.avatar || null;
+    const senderName = senderProfile?.name || senderFriend?.name || '?';
+
+    const avEl = document.createElement('div');
+    avEl.className = 'msg-av avatar-base';
+    if (senderAv) {
+      avEl.style.backgroundImage = `url('${senderAv}')`;
+      avEl.style.backgroundSize = 'cover';
+      avEl.style.backgroundPosition = 'center';
+    } else {
+      avEl.innerHTML = '<i class="ti ti-user"></i>';
+    }
+    row.appendChild(avEl);
+
+    // 단체방이면 이름도 표시
+    if (currentRoom.is_group) {
+      const bwrap = document.createElement('div');
+      bwrap.className = 'bwrap';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'msg-sender-name';
+      nameEl.textContent = senderName;
+      const bubble = makeBubbleEl(msg, isMine);
+      const meta = makeMetaEl(msg.created_at);
+      bwrap.appendChild(nameEl);
+      bwrap.appendChild(bubble);
+      bwrap.appendChild(meta);
+      row.appendChild(bwrap);
+      container.appendChild(row);
+      container.scrollTop = container.scrollHeight;
+      return;
+    }
+  }
+
+  const bwrap = document.createElement('div');
+  bwrap.className = 'bwrap';
+  const bubble = makeBubbleEl(msg, isMine);
+  const meta = makeMetaEl(msg.created_at);
+  bwrap.appendChild(bubble);
+  bwrap.appendChild(meta);
+  row.appendChild(bwrap);
+  container.appendChild(row);
+  container.scrollTop = container.scrollHeight;
+}
+
 renderChats(); // 목록 새로고침
 }
