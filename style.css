@@ -941,7 +941,7 @@ html, body {
 [data-theme="hellokitty"] #tab-chats i::before { content: "" !important; display: none; }
 
 [data-theme="hellokitty"] #tab-more i {
-  background-image: url('https://yrndqghsdtxoajgxvqrv.supabase.co/storage/v1/object/public/chat-images/HK-3.png') !important;
+  background-image: url('https://yrndqghsdtxoajgxvqrv.supabase.co/storage/v1/object/public/chat-images/HK-4.png') !important;
   background-size: contain !important;
   background-repeat: no-repeat !important;
   background-position: center !important;
@@ -1002,7 +1002,7 @@ html, body {
   width: 40px;
   height: 40px;
   margin: 20px auto;
-  background-image: url('https://cdn-icons-png.flaticon.com/512/1218/1218643.png');
+  background-image: url('https://yrndqghsdtxoajgxvqrv.supabase.co/storage/v1/object/public/chat-images/HK-3.png');
   background-size: contain;
   animation: kittySpin 1s infinite linear;
 }
