@@ -1223,6 +1223,12 @@ return meta;
   메시지 전송
   ============================================================ */
 async function sendPushNotification(text, isImage = false) {
+  // ✅ 앱이 활성화되어 있으면 푸시 알림 보내지 않음
+  if (isAppActive) {
+    console.log('앱 활성화 상태 - 푸시 알림 생략');
+    return;
+  }
+  
   try {
     const otherIds = currentRoom.members?.filter(id => id !== currentUserId) || [];
     if (otherIds.length === 0) return;
