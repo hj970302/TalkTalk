@@ -943,210 +943,269 @@ openRoomFromData(room.id);
 }
 
 async function openRoomFromData(roomId) {
-// 1. 이미 목록에 있는지 확인
-let room = chatRoomsList.find(r => r.id === roomId);
+  // 1. 이미 목록에 있는지 확인
+  let room = chatRoomsList.find(r => r.id === roomId);
 
-if (!room) {
-// 2. DB에서 방 정보 가져오기
-const { data: roomData } = await supabaseClient
-.from('chat_rooms')
-.select('*')
-.eq('id', roomId)
-.single();
+  if (!room) {
+    // 2. DB에서 방 정보 가져오기
+    const { data: roomData } = await supabaseClient
+      .from('chat_rooms')
+      .select('*')
+      .eq('id', roomId)
+      .single();
 
-if (!roomData) { 
-showToast("오류", "채팅방을 찾을 수 없습니다.", "#ff4757"); 
-return; 
+    if (!roomData) { 
+      showToast("오류", "채팅방을 찾을 수 없습니다.", "#ff4757"); 
+      return; 
+    }
+
+    room = roomData;
+
+    // 3. 멤버 정보 가져오기
+    const { data: memberRows } = await supabaseClient
+      .from('chat_room_members')
+      .select('user_id')
+      .eq('room_id', room.id);
+
+    room.members = memberRows?.map(r => r.user_id) || [];
+
+    // ✅ 중복 방지: 이미 목록에 없을 때만 추가
+    if (!chatRoomsList.find(r => r.id === room.id)) {
+      chatRoomsList.push(room);
+    }
+  }
+
+  // 4. 멤버 정보가 없으면 다시 가져오기 (안전 장치)
+  if (!room.members || room.members.length === 0) {
+    const { data: memberRows } = await supabaseClient
+      .from('chat_room_members')
+      .select('user_id')
+      .eq('room_id', room.id);
+    room.members = memberRows?.map(r => r.user_id) || [];
+  }
+
+  currentRoom = room;
+  roomOpen = true;
+
+  // ✅ 1:1 채팅방이면 상대방 이름으로 제목 설정
+  let displayTitle = room.name || (room.is_group ? '단체방' : '대화');
+
+  if (!room.is_group && room.members) {
+    const otherId = room.members.find(id => id !== currentUserId);
+    if (otherId) {
+      // friendsList에서 상대방 정보 찾기
+      const otherUser = friendsList.find(f => f.id === otherId);
+      if (otherUser) {
+        displayTitle = otherUser.name;
+      } else {
+        // friendsList에 없으면 DB에서 직접 조회
+        const { data: otherProfile } = await supabaseClient
+          .from('profiles')
+          .select('name')
+          .eq('id', otherId)
+          .single();
+        if (otherProfile) {
+          displayTitle = otherProfile.name;
+        }
+      }
+    }
+  }
+
+  // 단체방이면 멤버 수 표시, 개인톡은 멤버 수 숨김
+  const memberCount = room.members?.length || 0;
+  if (room.is_group) {
+    document.getElementById('room-title').innerHTML = `${displayTitle} <span style="font-size:12px; opacity:0.7; font-weight:normal;">(${memberCount})</span>`;
+  } else {
+    document.getElementById('room-title').innerHTML = displayTitle;
+  }
+
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-room').classList.add('active');
+  document.getElementById('tab-bar').style.display = 'none';
+
+  if (messagesSubscription) {
+    await supabaseClient.removeChannel(messagesSubscription);
+    messagesSubscription = null;
+  }
+
+  messagesSubscription = supabaseClient
+    .channel(`messages-room-${room.id}`)
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+      const msg = payload.new;
+      if (msg.room_id !== room.id) return;
+      if (msg.sender_id === currentUserId) return;
+      if (blockedList.includes(msg.sender_id)) return;
+      if (!roomOpen || currentRoom.id !== room.id) {
+        const sender = friendsList.find(f => f.id === msg.sender_id);
+        showChatNotification(sender?.name || '누군가', msg.content || '사진', sender?.avatar, msg.room_id);
+      } else {
+        appendMessageToUI(msg);
+      }
+    })
+    .subscribe();
+
+  await loadMessages(room.id);
+  await markMessagesAsRead(room.id);
+  
+  // ✅ 스크롤 이벤트 리스너 추가 (더 불러오기) - 여기 추가됨
+  const messagesContainer = document.getElementById('room-messages');
+  if (messagesContainer) {
+    messagesContainer.removeEventListener('scroll', handleScrollLoadMore);
+    messagesContainer.addEventListener('scroll', handleScrollLoadMore);
+  }
 }
 
-room = roomData;
+// ============================================================
+// 메시지 페이징 로딩 변수
+// ============================================================
+const MESSAGES_PER_PAGE = 20;  // 한 번에 불러올 메시지 수
+let currentMessagePage = 1;
+let isLoadingMoreMessages = false;
+let hasMoreMessages = true;
+let currentLoadingRoomId = null;
 
-// 3. 멤버 정보 가져오기
-const { data: memberRows } = await supabaseClient
-.from('chat_room_members')
-.select('user_id')
-.eq('room_id', room.id);
-
-room.members = memberRows?.map(r => r.user_id) || [];
-
-// ✅ 중복 방지: 이미 목록에 없을 때만 추가
-if (!chatRoomsList.find(r => r.id === room.id)) {
-chatRoomsList.push(room);
-}
-}
-
-// 4. 멤버 정보가 없으면 다시 가져오기 (안전 장치)
-if (!room.members || room.members.length === 0) {
-const { data: memberRows } = await supabaseClient
-.from('chat_room_members')
-.select('user_id')
-.eq('room_id', room.id);
-room.members = memberRows?.map(r => r.user_id) || [];
-}
-
-currentRoom = room;
-roomOpen = true;
-
-// ✅ 1:1 채팅방이면 상대방 이름으로 제목 설정
-let displayTitle = room.name || (room.is_group ? '단체방' : '대화');
-
-if (!room.is_group && room.members) {
-const otherId = room.members.find(id => id !== currentUserId);
-if (otherId) {
-// friendsList에서 상대방 정보 찾기
-const otherUser = friendsList.find(f => f.id === otherId);
-if (otherUser) {
-displayTitle = otherUser.name;
-} else {
-// friendsList에 없으면 DB에서 직접 조회
-const { data: otherProfile } = await supabaseClient
-.from('profiles')
-.select('name')
-.eq('id', otherId)
-.single();
-if (otherProfile) {
-displayTitle = otherProfile.name;
-}
-}
-}
-}
-
-// 단체방이면 멤버 수 표시, 개인톡은 멤버 수 숨김
-const memberCount = room.members?.length || 0;
-if (room.is_group) {
-document.getElementById('room-title').innerHTML = `${displayTitle} <span style="font-size:12px; opacity:0.7; font-weight:normal;">(${memberCount})</span>`;
-} else {
-document.getElementById('room-title').innerHTML = displayTitle;
-}
-
-document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-document.getElementById('screen-room').classList.add('active');
-document.getElementById('tab-bar').style.display = 'none';
-
-if (messagesSubscription) {
-await supabaseClient.removeChannel(messagesSubscription);
-messagesSubscription = null;
-}
-
-messagesSubscription = supabaseClient
-.channel(`messages-room-${room.id}`)
-.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-const msg = payload.new;
-if (msg.room_id !== room.id) return;
-if (msg.sender_id === currentUserId) return;
-if (blockedList.includes(msg.sender_id)) return;
-if (!roomOpen || currentRoom.id !== room.id) {
-const sender = friendsList.find(f => f.id === msg.sender_id);
-showChatNotification(sender?.name || '누군가', msg.content || '사진', sender?.avatar, msg.room_id);
-} else {
-appendMessageToUI(msg);
-}
-})
-.subscribe();
-
-await loadMessages(room.id);
-await markMessagesAsRead(room.id);
-}
-
-async function loadMessages(roomId) {
-const container = document.getElementById('room-messages');
-if (!container) return;
-
-// 로딩 표시
-container.innerHTML = '<div class="loading-spinner"></div><div style="text-align:center; padding:20px;">메시지 불러오는 중...</div>';
-
-// 1. 메시지만 먼저 가져오기
-const { data: messages } = await supabaseClient
-.from('messages')
-.select('*')
-.eq('room_id', roomId)
-.order('created_at', { ascending: true });
-
-// 2. 방 멤버 정보 (친구 목록에서 재사용)
-const memberIds = currentRoom.members || [];
-
-// 3. 프로필 정보 (친구 목록 + 본인)
-const memberProfiles = memberIds.map(id => {
-if (id === currentUserId) return currentUserProfile;
-return friendsList.find(f => f.id === id);
-}).filter(Boolean);
-
-window._roomMemberProfiles = memberProfiles;
-
-// 4. 메시지 렌더링
-container.innerHTML = `<div class="date-sep"><span>${dateStr()}</span></div>`;
-
-for (const msg of messages || []) {
-if (msg.deleted_for_all) continue;
-if (blockedList.includes(msg.sender_id)) continue;
-
-// ✅ 내가 나가서 삭제한 메시지는 안 보이게 필터링
-const deletedForMe = msg.deleted_for_me || [];
-if (deletedForMe.includes(currentUserId)) continue;
-
-appendMessageToUI(msg);
+async function loadMessages(roomId, isLoadMore = false) {
+  const container = document.getElementById('room-messages');
+  if (!container) return;
+  
+  // 새 방이면 페이지 초기화
+  if (currentLoadingRoomId !== roomId) {
+    currentMessagePage = 1;
+    hasMoreMessages = true;
+    currentLoadingRoomId = roomId;
+  }
+  
+  if (!isLoadMore) {
+    currentMessagePage = 1;
+    hasMoreMessages = true;
+    container.innerHTML = '<div class="loading-spinner"></div><div style="text-align:center; padding:20px;">메시지 불러오는 중...</div>';
+  }
+  
+  // ✅ 페이징 처리 (최신순으로 가져와서 뒤집을 거임)
+  const start = (currentMessagePage - 1) * MESSAGES_PER_PAGE;
+  const end = currentMessagePage * MESSAGES_PER_PAGE - 1;
+  
+  const { data: messages, error } = await supabaseClient
+    .from('messages')
+    .select('*')
+    .eq('room_id', roomId)
+    .order('created_at', { ascending: false })  // 최신순
+    .range(start, end);
+  
+  if (error) {
+    console.error('메시지 로드 오류:', error);
+    return;
+  }
+  
+  // ✅ 더 불러올 메시지가 있는지 확인
+  hasMoreMessages = messages.length === MESSAGES_PER_PAGE;
+  
+  // ✅ 오래된 순으로 정렬 (화면 표시용)
+  const sortedMessages = [...messages].reverse();
+  
+  // 방 멤버 정보
+  const memberIds = currentRoom.members || [];
+  const memberProfiles = memberIds.map(id => {
+    if (id === currentUserId) return currentUserProfile;
+    return friendsList.find(f => f.id === id);
+  }).filter(Boolean);
+  window._roomMemberProfiles = memberProfiles;
+  
+  if (!isLoadMore) {
+    // 첫 로드
+    container.innerHTML = `<div class="date-sep"><span>${dateStr()}</span></div>`;
+    for (const msg of sortedMessages) {
+      if (msg.deleted_for_all) continue;
+      if (blockedList.includes(msg.sender_id)) continue;
+      const deletedForMe = msg.deleted_for_me || [];
+      if (deletedForMe.includes(currentUserId)) continue;
+      appendMessageToUI(msg);
+    }
+    container.scrollTop = container.scrollHeight;
+  } else {
+    // 추가 로드 (스크롤 위로 올리면)
+    const oldScrollHeight = container.scrollHeight;
+    for (const msg of sortedMessages) {
+      if (msg.deleted_for_all) continue;
+      if (blockedList.includes(msg.sender_id)) continue;
+      const deletedForMe = msg.deleted_for_me || [];
+      if (deletedForMe.includes(currentUserId)) continue;
+      
+      // 메시지 요소 생성
+      const msgElement = createMessageElement(msg);
+      container.insertBefore(msgElement, container.firstChild);
+    }
+    // 스크롤 위치 유지
+    const newScrollHeight = container.scrollHeight;
+    container.scrollTop = newScrollHeight - oldScrollHeight;
+  }
+  
+  currentMessagePage++;
 }
 
-container.scrollTop = container.scrollHeight;
+// 메시지 요소 생성 함수 (appendMessageToUI에서 분리)
+function createMessageElement(msg) {
+  const isMine = msg.sender_id === currentUserId;
+  const row = document.createElement('div');
+  row.className = `msg-row ${isMine ? 'mine' : 'other'}`;
+  if (msg.id) row.setAttribute('data-msg-id', msg.id);
+  
+  if (!isMine) {
+    const profiles = window._roomMemberProfiles || [];
+    const senderProfile = profiles.find(p => p.id === msg.sender_id);
+    const senderFriend = friendsList.find(f => f.id === msg.sender_id);
+    const senderAv = senderProfile?.avatar || senderFriend?.avatar || null;
+    const senderName = senderProfile?.name || senderFriend?.name || '?';
+    
+    const avEl = document.createElement('div');
+    avEl.className = 'msg-av avatar-base';
+    if (senderAv) {
+      avEl.style.backgroundImage = `url('${senderAv}')`;
+      avEl.style.backgroundSize = 'cover';
+      avEl.style.backgroundPosition = 'center';
+    } else {
+      avEl.innerHTML = '<i class="ti ti-user"></i>';
+    }
+    row.appendChild(avEl);
+    
+    if (currentRoom.is_group) {
+      const bwrap = document.createElement('div');
+      bwrap.className = 'bwrap';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'msg-sender-name';
+      nameEl.textContent = senderName;
+      const bubble = makeBubbleEl(msg, isMine);
+      const meta = makeMetaEl(msg.created_at);
+      bwrap.appendChild(nameEl);
+      bwrap.appendChild(bubble);
+      bwrap.appendChild(meta);
+      row.appendChild(bwrap);
+      return row;
+    }
+  }
+  
+  const bwrap = document.createElement('div');
+  bwrap.className = 'bwrap';
+  const bubble = makeBubbleEl(msg, isMine);
+  const meta = makeMetaEl(msg.created_at);
+  bwrap.appendChild(bubble);
+  bwrap.appendChild(meta);
+  row.appendChild(bwrap);
+  return row;
 }
 
-function appendMessageToUI(msg) {
-const container = document.getElementById('room-messages');
-if (!container) return;
-if (msg.id && container.querySelector(`[data-msg-id="${msg.id}"]`)) return;
-
-const isMine = msg.sender_id === currentUserId;
-const row = document.createElement('div');
-row.className = `msg-row ${isMine ? 'mine' : 'other'}`;
-if (msg.id) row.setAttribute('data-msg-id', msg.id);
-
-// 상대방 아바타
-if (!isMine) {
-const profiles = window._roomMemberProfiles || [];
-const senderProfile = profiles.find(p => p.id === msg.sender_id);
-const senderFriend = friendsList.find(f => f.id === msg.sender_id);
-const senderAv = senderProfile?.avatar || senderFriend?.avatar || null;
-const senderName = senderProfile?.name || senderFriend?.name || '?';
-
-const avEl = document.createElement('div');
-avEl.className = 'msg-av avatar-base';
-if (senderAv) {
-avEl.style.backgroundImage = `url('${senderAv}')`;
-avEl.style.backgroundSize = 'cover';
-avEl.style.backgroundPosition = 'center';
-} else {
-avEl.innerHTML = '<i class="ti ti-user"></i>';
-}
-row.appendChild(avEl);
-
-// 단체방이면 이름도 표시
-if (currentRoom.is_group) {
-const bwrap = document.createElement('div');
-bwrap.className = 'bwrap';
-const nameEl = document.createElement('div');
-nameEl.className = 'msg-sender-name';
-nameEl.textContent = senderName;
-const bubble = makeBubbleEl(msg, isMine);
-const meta = makeMetaEl(msg.created_at);
-bwrap.appendChild(nameEl);
-bwrap.appendChild(bubble);
-bwrap.appendChild(meta);
-row.appendChild(bwrap);
-container.appendChild(row);
-container.scrollTop = container.scrollHeight;
-return;
-}
-}
-
-const bwrap = document.createElement('div');
-bwrap.className = 'bwrap';
-const bubble = makeBubbleEl(msg, isMine);
-const meta = makeMetaEl(msg.created_at);
-bwrap.appendChild(bubble);
-bwrap.appendChild(meta);
-row.appendChild(bwrap);
-container.appendChild(row);
-container.scrollTop = container.scrollHeight;
+// 스크롤 위로 올리면 추가 로드
+function handleScrollLoadMore() {
+  const container = document.getElementById('room-messages');
+  if (!container) return;
+  
+  // 스크롤이 맨 위에 있고, 로딩 중이 아니며, 더 있을 때
+  if (container.scrollTop === 0 && !isLoadingMoreMessages && hasMoreMessages && currentLoadingRoomId === currentRoom?.id) {
+    isLoadingMoreMessages = true;
+    loadMessages(currentRoom.id, true).finally(() => {
+      isLoadingMoreMessages = false;
+    });
+  }
 }
 
 function makeBubbleEl(msg, isMine) {
