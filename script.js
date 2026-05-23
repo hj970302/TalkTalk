@@ -89,8 +89,13 @@ setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 200);
 function showChatNotification(name, text, avatarUrl, roomId) {
   const tc = document.getElementById('toast-container');
   if (!tc) return;
+
+  // 기존 채팅 토스트가 있으면 즉시 제거 (최신 1개만 유지)
+  const existing = tc.querySelector('.toast-chat');
+  if (existing) existing.remove();
+
   const t = document.createElement('div');
-  t.className = 'toast';
+  t.className = 'toast toast-chat';
   const avStyle = avatarUrl ? `style="background-image:url('${avatarUrl}'); background-size:cover; background-position:center;"` : '';
   t.innerHTML = `<div class="toast-avatar avatar-base" ${avStyle}>${avatarUrl?'':'<i class="ti ti-user"></i>'}</div>
                  <div class="toast-body"><div class="toast-name">${name}</div><div class="toast-msg">${text}</div></div>`;
