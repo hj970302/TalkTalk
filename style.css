@@ -81,8 +81,6 @@ html, body {
   position: relative;
   overflow: hidden;
   padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  box-sizing: border-box;
 }
 
 /* ============================================================
@@ -538,6 +536,7 @@ html, body {
   --section-title: #c4a56e;
   --swipe-bg: #fff9e8;
   --chat-item-bg: #fff9e8;
+  --tab-bar: #fff9e8;
 }
 
 /* 헤더 배경 */
