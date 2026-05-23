@@ -917,7 +917,7 @@ html, body {
 
 /* 탭바 아이콘 (헬로키티 스타일 - 리본/고양이 이미지) */
 [data-theme="hellokitty"] #tab-friends i {
-  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png') !important;
+  background-image: url('https://cdn-icons-png.flaticon.com/512/1218/1218643.png') !important;
   background-size: contain !important;
   background-repeat: no-repeat !important;
   background-position: center !important;
@@ -929,7 +929,7 @@ html, body {
 [data-theme="hellokitty"] #tab-friends i::before { content: "" !important; display: none; }
 
 [data-theme="hellokitty"] #tab-chats i {
-  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png') !important;
+  background-image: url('https://cdn-icons-png.flaticon.com/512/1218/1218645.png') !important;
   background-size: contain !important;
   background-repeat: no-repeat !important;
   background-position: center !important;
@@ -941,7 +941,7 @@ html, body {
 [data-theme="hellokitty"] #tab-chats i::before { content: "" !important; display: none; }
 
 [data-theme="hellokitty"] #tab-more i {
-  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png') !important;
+  background-image: url('https://cdn-icons-png.flaticon.com/512/1218/1218646.png') !important;
   background-size: contain !important;
   background-repeat: no-repeat !important;
   background-position: center !important;
