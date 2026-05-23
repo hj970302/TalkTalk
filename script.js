@@ -1419,51 +1419,70 @@ sendPushNotification(text);
 }
 }
 
+function compressImage(file, maxWidth, quality) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxWidth / img.width);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(resolve, 'image/jpeg', quality);
+    };
+    img.src = url;
+  });
+}
+
 async function handleClipFile(inputElement) {
-const file = inputElement.files[0];
-if (!file) return;
-if (!file.type.startsWith('image/')) {
-showToast("오류", "이미지 파일만 첨부 가능합니다.", "#ff4757");
-return;
+  const file = inputElement.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    showToast("오류", "이미지 파일만 첨부 가능합니다.", "#ff4757");
+    return;
+  }
+
+  // 최대 1280px, 품질 0.75로 압축
+  const compressed = await compressImage(file, 1280, 0.75);
+  const fileName = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 8)}.jpg`;
+
+  const { error: uploadError } = await supabaseClient.storage
+  .from('chat-images')
+  .upload(fileName, compressed);
+
+  if (uploadError) {
+    console.error('업로드 실패:', uploadError);
+    showToast("오류", "이미지 업로드에 실패했습니다.", "#ff4757");
+    inputElement.value = "";
+    return;
+  }
+
+  const { data: urlData } = supabaseClient.storage
+  .from('chat-images')
+  .getPublicUrl(fileName);
+
+  const { data, error: dbError } = await supabaseClient.from('messages').insert({
+    room_id: currentRoom.id,
+    sender_id: currentUserId,
+    image_url: urlData.publicUrl,
+    type: 'image',
+    content: '📷 사진'
+  }).select().single();
+
+  if (dbError) {
+    showToast("오류", "메시지 저장에 실패했습니다.", "#ff4757");
+  } else {
+    appendMessageToUI(data);
+    if (!roomOpen) renderChats();
+    sendPushNotification('📷 사진', true);
+  }
+
+  inputElement.value = "";
 }
-
-const ext = file.name.split('.').pop();
-const fileName = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 8)}.${ext}`;
-
-const { error: uploadError } = await supabaseClient.storage
-.from('chat-images')
-.upload(fileName, file);
-
-if (uploadError) {
-console.error('업로드 실패:', uploadError);
-showToast("오류", "이미지 업로드에 실패했습니다.", "#ff4757");
-inputElement.value = "";
-return;
-}
-
-const { data: urlData } = supabaseClient.storage
-.from('chat-images')
-.getPublicUrl(fileName);
-
-const { data, error: dbError } = await supabaseClient.from('messages').insert({
-room_id: currentRoom.id,
-sender_id: currentUserId,
-image_url: urlData.publicUrl,
-type: 'image',
-content: '📷 사진'
-}).select().single();
-
-if (dbError) {
-showToast("오류", "메시지 저장에 실패했습니다.", "#ff4757");
-} else {
-appendMessageToUI(data);
-if (!roomOpen) renderChats();
-sendPushNotification('📷 사진', true);  // ✅ 여기에 , true 추가
-}
-
-inputElement.value = "";
-}
-
 function triggerClip() { 
 document.getElementById('clip-file-input')?.click(); 
 }
@@ -1718,65 +1737,63 @@ if (type === 'avatar') document.getElementById('avatar-file-input').click();
 }
 
 async function handleProfileImageUpload(inputElement, type) {
-const file = inputElement.files[0];
-if (!file || !currentUserId) return;
+  const file = inputElement.files[0];
+  if (!file || !currentUserId) return;
 
-if (!file.type.startsWith('image/')) {
-showToast("오류", "이미지 파일만 업로드 가능합니다.", "#ff4757");
-return;
+  if (!file.type.startsWith('image/')) {
+    showToast("오류", "이미지 파일만 업로드 가능합니다.", "#ff4757");
+    return;
+  }
+
+  // 이전 파일 Storage에서 삭제 (변경할 때마다 누적 방지)
+  const oldUrl = type === 'avatar' ? currentUserProfile.avatar : currentUserProfile.bg;
+  if (oldUrl) {
+    const oldFileName = oldUrl.split('/').pop().split('?')[0];
+    if (oldFileName) {
+      await supabaseClient.storage.from('chat-images').remove([oldFileName]);
+    }
+  }
+
+  // 프로필 400px / 배경 1280px, 품질 0.80
+  const maxWidth = type === 'avatar' ? 400 : 1280;
+  const compressed = await compressImage(file, maxWidth, 0.80);
+  const fileName = `${type}_${currentUserId}_${Date.now()}.jpg`;
+
+  const { error: uploadError } = await supabaseClient.storage
+  .from('chat-images')
+  .upload(fileName, compressed);
+
+  if (uploadError) {
+    console.error('업로드 실패:', uploadError);
+    showToast("오류", "이미지 업로드에 실패했습니다.", "#ff4757");
+    inputElement.value = "";
+    return;
+  }
+
+  const { data: urlData } = supabaseClient.storage
+  .from('chat-images')
+  .getPublicUrl(fileName);
+
+  const updateData = type === 'avatar' ? { avatar: urlData.publicUrl } : { bg: urlData.publicUrl };
+  await supabaseClient.from('profiles').update(updateData).eq('id', currentUserId);
+
+  if (type === 'avatar') {
+    currentUserProfile.avatar = urlData.publicUrl;
+  } else {
+    currentUserProfile.bg = urlData.publicUrl;
+  }
+
+  syncMyProfileDOM();
+  openProfileCard('me');
+  showToast("프로필", type === 'avatar' ? "프로필 사진이 변경되었습니다." : "배경 사진이 변경되었습니다.", "#2ed573");
+
+  friendsList.forEach(f => {
+    if (f.id === currentUserId) f.avatar = currentUserProfile.avatar;
+  });
+
+  renderChats();
+  inputElement.value = "";
 }
-
-// 파일 크기 제한 (5MB)
-if (file.size > 5 * 1024 * 1024) {
-showToast("오류", "5MB 이하의 이미지만 업로드 가능합니다.", "#ff4757");
-return;
-}
-
-// 파일명 생성
-const ext = file.name.split('.').pop();
-const fileName = `${type}_${currentUserId}_${Date.now()}.${ext}`;
-
-// 1. Storage에 업로드
-const { error: uploadError } = await supabaseClient.storage
-.from('chat-images')
-.upload(fileName, file);
-
-if (uploadError) {
-console.error('업로드 실패:', uploadError);
-showToast("오류", "이미지 업로드에 실패했습니다.", "#ff4757");
-inputElement.value = "";
-return;
-}
-
-// 2. public URL 얻기
-const { data: urlData } = supabaseClient.storage
-.from('chat-images')
-.getPublicUrl(fileName);
-
-// 3. DB에 URL 저장
-const updateData = type === 'avatar' ? { avatar: urlData.publicUrl } : { bg: urlData.publicUrl };
-await supabaseClient.from('profiles').update(updateData).eq('id', currentUserId);
-
-// 4. 상태 업데이트
-if (type === 'avatar') {
-currentUserProfile.avatar = urlData.publicUrl;
-} else {
-currentUserProfile.bg = urlData.publicUrl;
-}
-
-syncMyProfileDOM();
-openProfileCard('me');
-showToast("프로필", type === 'avatar' ? "프로필 사진이 변경되었습니다." : "배경 사진이 변경되었습니다.", "#2ed573");
-
-// friendsList 업데이트 (내 프로필 사진)
-friendsList.forEach(f => {
-if (f.id === currentUserId) f.avatar = currentUserProfile.avatar;
-});
-
-renderChats();
-inputElement.value = "";
-}
-
 /* ============================================================
   텍스트 편집 (이름 / 상태메시지)
   ============================================================ */
