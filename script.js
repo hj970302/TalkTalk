@@ -56,6 +56,8 @@ if (currentTheme === 'dark') {
 document.documentElement.setAttribute('data-theme', 'dark');
 } else if (currentTheme === 'pokemon') {
 document.documentElement.setAttribute('data-theme', 'pokemon');
+} else if (currentTheme === 'hellokitty') {
+document.documentElement.setAttribute('data-theme', 'hellokitty');
 } else {
 document.documentElement.removeAttribute('data-theme'); // white는 기본
 }
@@ -2204,7 +2206,7 @@ updateThemeCards();
 }
 
 function updateThemeCards() {
-  const themes = ['white', 'dark', 'pokemon'];
+  const themes = ['white', 'dark', 'pokemon', 'hellokitty'];
   themes.forEach(t => {
     const card = document.getElementById('theme-' + t);
     if (card) card.classList.toggle('selected', currentTheme === t);
