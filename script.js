@@ -1081,7 +1081,6 @@ async function loadMessages(roomId, isLoadMore = false) {
     container.innerHTML = '<div class="loading-spinner"></div><div style="text-align:center; padding:20px;">메시지 불러오는 중...</div>';
   }
   
-  // ✅ 페이징 처리 (최신순으로 가져와서 뒤집을 거임)
   const start = (currentMessagePage - 1) * MESSAGES_PER_PAGE;
   const end = currentMessagePage * MESSAGES_PER_PAGE - 1;
   
@@ -1089,7 +1088,7 @@ async function loadMessages(roomId, isLoadMore = false) {
     .from('messages')
     .select('*')
     .eq('room_id', roomId)
-    .order('created_at', { ascending: false })  // 최신순
+    .order('created_at', { ascending: false })
     .range(start, end);
   
   if (error) {
@@ -1097,13 +1096,9 @@ async function loadMessages(roomId, isLoadMore = false) {
     return;
   }
   
-  // ✅ 더 불러올 메시지가 있는지 확인
   hasMoreMessages = messages.length === MESSAGES_PER_PAGE;
-  
-  // ✅ 오래된 순으로 정렬 (화면 표시용)
   const sortedMessages = [...messages].reverse();
   
-  // 방 멤버 정보
   const memberIds = currentRoom.members || [];
   const memberProfiles = memberIds.map(id => {
     if (id === currentUserId) return currentUserProfile;
@@ -1111,103 +1106,90 @@ async function loadMessages(roomId, isLoadMore = false) {
   }).filter(Boolean);
   window._roomMemberProfiles = memberProfiles;
   
+  // ✅ 날짜 포맷 함수
+  const formatDateLabel = (date) => {
+    const d = new Date(date);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    
+    if (d.toDateString() === today.toDateString()) {
+      return '오늘';
+    }
+    if (d.toDateString() === yesterday.toDateString()) {
+      return '어제';
+    }
+    return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+  };
+  
+  // ✅ 날짜 구분선 추가 함수
+  const addDateSeparator = (dateLabel) => {
+    const separator = document.createElement('div');
+    separator.className = 'date-sep';
+    separator.innerHTML = `<span>${dateLabel}</span>`;
+    return separator;
+  };
+  
   if (!isLoadMore) {
     // 첫 로드
-    container.innerHTML = `<div class="date-sep"><span>${dateStr()}</span></div>`;
-    for (const msg of sortedMessages) {
-      if (msg.deleted_for_all) continue;
-      if (blockedList.includes(msg.sender_id)) continue;
-      const deletedForMe = msg.deleted_for_me || [];
-      if (deletedForMe.includes(currentUserId)) continue;
-      appendMessageToUI(msg);
-    }
-    container.scrollTop = container.scrollHeight;
-  } else {
-    // 추가 로드 (스크롤 위로 올리면)
-    const oldScrollHeight = container.scrollHeight;
+    container.innerHTML = '';
+    let lastDate = null;
+    
     for (const msg of sortedMessages) {
       if (msg.deleted_for_all) continue;
       if (blockedList.includes(msg.sender_id)) continue;
       const deletedForMe = msg.deleted_for_me || [];
       if (deletedForMe.includes(currentUserId)) continue;
       
-      // 메시지 요소 생성
-      const msgElement = createMessageElement(msg);
-      container.insertBefore(msgElement, container.firstChild);
+      const msgDate = new Date(msg.created_at).toDateString();
+      if (lastDate !== msgDate) {
+        // 날짜가 바뀌면 구분선 추가
+        container.appendChild(addDateSeparator(formatDateLabel(msg.created_at)));
+        lastDate = msgDate;
+      }
+      
+      appendMessageToUI(msg);
     }
-    // 스크롤 위치 유지
+    container.scrollTop = container.scrollHeight;
+  } else {
+    // 추가 로드 (스크롤 위로 올리면)
+    const oldScrollHeight = container.scrollHeight;
+    let lastDate = null;
+    
+    // 현재 화면에 보이는 첫 번째 날짜 확인
+    const firstMsgElement = container.querySelector('.msg-row');
+    
+    // 추가할 메시지들을 임시로 담을 컨테이너
+    const tempContainer = document.createElement('div');
+    
+    for (const msg of sortedMessages) {
+      if (msg.deleted_for_all) continue;
+      if (blockedList.includes(msg.sender_id)) continue;
+      const deletedForMe = msg.deleted_for_me || [];
+      if (deletedForMe.includes(currentUserId)) continue;
+      
+      const msgDate = new Date(msg.created_at).toDateString();
+      if (lastDate !== msgDate) {
+        // 날짜가 바뀌면 구분선 추가
+        tempContainer.appendChild(addDateSeparator(formatDateLabel(msg.created_at)));
+        lastDate = msgDate;
+      }
+      
+      const msgElement = createMessageElement(msg);
+      tempContainer.appendChild(msgElement);
+    }
+    
+    // 임시 컨테이너의 내용을 실제 컨테이너 맨 앞에 추가
+    while (tempContainer.firstChild) {
+      container.insertBefore(tempContainer.firstChild, container.firstChild);
+    }
+    
     const newScrollHeight = container.scrollHeight;
     container.scrollTop = newScrollHeight - oldScrollHeight;
   }
   
   currentMessagePage++;
 }
-
-// 메시지 요소 생성 함수 (appendMessageToUI에서 분리)
-function createMessageElement(msg) {
-  const isMine = msg.sender_id === currentUserId;
-  const row = document.createElement('div');
-  row.className = `msg-row ${isMine ? 'mine' : 'other'}`;
-  if (msg.id) row.setAttribute('data-msg-id', msg.id);
-  
-  if (!isMine) {
-    const profiles = window._roomMemberProfiles || [];
-    const senderProfile = profiles.find(p => p.id === msg.sender_id);
-    const senderFriend = friendsList.find(f => f.id === msg.sender_id);
-    const senderAv = senderProfile?.avatar || senderFriend?.avatar || null;
-    const senderName = senderProfile?.name || senderFriend?.name || '?';
-    
-    const avEl = document.createElement('div');
-    avEl.className = 'msg-av avatar-base';
-    if (senderAv) {
-      avEl.style.backgroundImage = `url('${senderAv}')`;
-      avEl.style.backgroundSize = 'cover';
-      avEl.style.backgroundPosition = 'center';
-    } else {
-      avEl.innerHTML = '<i class="ti ti-user"></i>';
-    }
-    row.appendChild(avEl);
-    
-    if (currentRoom.is_group) {
-      const bwrap = document.createElement('div');
-      bwrap.className = 'bwrap';
-      const nameEl = document.createElement('div');
-      nameEl.className = 'msg-sender-name';
-      nameEl.textContent = senderName;
-      const bubble = makeBubbleEl(msg, isMine);
-      const meta = makeMetaEl(msg.created_at);
-      bwrap.appendChild(nameEl);
-      bwrap.appendChild(bubble);
-      bwrap.appendChild(meta);
-      row.appendChild(bwrap);
-      return row;
-    }
-  }
-  
-  const bwrap = document.createElement('div');
-  bwrap.className = 'bwrap';
-  const bubble = makeBubbleEl(msg, isMine);
-  const meta = makeMetaEl(msg.created_at);
-  bwrap.appendChild(bubble);
-  bwrap.appendChild(meta);
-  row.appendChild(bwrap);
-  return row;
-}
-
-// 스크롤 위로 올리면 추가 로드
-function handleScrollLoadMore() {
-  const container = document.getElementById('room-messages');
-  if (!container) return;
-  
-  // 스크롤이 맨 위에 있고, 로딩 중이 아니며, 더 있을 때
-  if (container.scrollTop === 0 && !isLoadingMoreMessages && hasMoreMessages && currentLoadingRoomId === currentRoom?.id) {
-    isLoadingMoreMessages = true;
-    loadMessages(currentRoom.id, true).finally(() => {
-      isLoadingMoreMessages = false;
-    });
-  }
-}
-
 function makeBubbleEl(msg, isMine) {
 const bubble = document.createElement('div');
 
