@@ -302,37 +302,48 @@ registerCard?.classList.add('active');
 }
 
 async function handleRegister() {
-const username = document.getElementById('reg-id').value.trim();
-const pw = document.getElementById('reg-pw').value.trim();
-const pwConfirm = document.getElementById('reg-pw-confirm').value.trim();
-const name = document.getElementById('reg-name').value.trim();
-if (!username || !pw || !pwConfirm || !name) { alert("모든 빈칸을 입력해주세요."); return; }
-if (pw !== pwConfirm) { alert("비밀번호가 일치하지 않습니다."); return; }
-if (pw.length < 4) { alert("비밀번호는 4자 이상 입력해주세요."); return; }
+  const username = document.getElementById('reg-id').value.trim();
+  const pw = document.getElementById('reg-pw').value.trim();
+  const pwConfirm = document.getElementById('reg-pw-confirm').value.trim();
+  const name = document.getElementById('reg-name').value.trim();
+  if (!username || !pw || !pwConfirm || !name) { alert("모든 빈칸을 입력해주세요."); return; }
+  if (pw !== pwConfirm) { alert("비밀번호가 일치하지 않습니다."); return; }
+  if (pw.length < 4) { alert("비밀번호는 4자 이상 입력해주세요."); return; }
 
-const { data: existingUser } = await supabaseClient.from('profiles').select('username').eq('username', username).maybeSingle();
-if (existingUser) { alert("이미 존재하는 아이디입니다."); return; }
+  // ✅ 신규 가입 제한 확인 (관리자 설정 체크)
+  const { data: adminProfile } = await supabaseClient
+    .from('profiles')
+    .select('is_signup_enabled')
+    .eq('is_admin', true)
+    .maybeSingle();
 
-const fakeEmail = username + "@talktalk.app";
-const { data, error } = await supabaseClient.auth.signUp({
-email: fakeEmail, password: pw,
-options: { data: { username, name } }
-});
-if (error || !data.user) { alert("회원가입에 실패했습니다."); return; }
+  if (adminProfile && adminProfile.is_signup_enabled === false) {
+    alert("⚠️ 관리자가 신규 계정 생성을 제한했습니다.\n나중에 다시 시도해주세요.");
+    return;
+  }
 
-const { error: profileError } = await supabaseClient.from('profiles').insert({
-id: data.user.id, username, name, status: ''
-});
-if (profileError) { alert("회원가입에 실패했습니다."); return; }
+  const { data: existingUser } = await supabaseClient.from('profiles').select('username').eq('username', username).maybeSingle();
+  if (existingUser) { alert("이미 존재하는 아이디입니다."); return; }
 
-localStorage.setItem('talktalk_session', data.user.id);
-currentUserId = data.user.id;
-await loadUserData(data.user.id);
-document.getElementById('auth-screen').style.display = 'none';
-showToast("가입 축하", name + "님의 아이디가 생성되었습니다.", "#2ed573");
-['reg-id','reg-pw','reg-pw-confirm','reg-name'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const fakeEmail = username + "@talktalk.app";
+  const { data, error } = await supabaseClient.auth.signUp({
+    email: fakeEmail, password: pw,
+    options: { data: { username, name } }
+  });
+  if (error || !data.user) { alert("회원가입에 실패했습니다."); return; }
+
+  const { error: profileError } = await supabaseClient.from('profiles').insert({
+    id: data.user.id, username, name, status: '', is_signup_enabled: true
+  });
+  if (profileError) { alert("회원가입에 실패했습니다."); return; }
+
+  localStorage.setItem('talktalk_session', data.user.id);
+  currentUserId = data.user.id;
+  await loadUserData(data.user.id);
+  document.getElementById('auth-screen').style.display = 'none';
+  showToast("가입 축하", name + "님의 아이디가 생성되었습니다.", "#2ed573");
+  ['reg-id','reg-pw','reg-pw-confirm','reg-name'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
 }
-
 async function handleLogin() {
   const username = document.getElementById('login-id').value.trim();
   const pw = document.getElementById('login-pw').value.trim();
@@ -2007,12 +2018,11 @@ listEl.innerHTML = profiles.filter(p => p.id !== currentUserId).map(p => `
 async function toggleBanUser(userId, isBanned) {
   const newBanStatus = !isBanned;
   
-  // 밴을 하면 강제 로그아웃도 함께 처리
   await supabaseClient
     .from('profiles')
     .update({ 
       is_banned: newBanStatus,
-      is_logged_in: newBanStatus ? false : true  // 밴 당하면 로그아웃
+      is_logged_in: newBanStatus ? false : true  // 밴 당하면 강제 로그아웃
     })
     .eq('id', userId);
   
@@ -2408,4 +2418,57 @@ await supabaseClient
 }
 
 renderChats(); // 목록 새로고침
+}
+
+// 전역 변수
+let isSignupLocked = false;
+
+// 가입 제한 상태 불러오기
+async function loadSignupLockStatus() {
+  const { data, error } = await supabaseClient
+    .from('profiles')
+    .select('is_signup_enabled')
+    .eq('id', currentUserId)
+    .single();
+  
+  if (!error && data) {
+    isSignupLocked = !data.is_signup_enabled;
+    updateSignupLockUI();
+  }
+}
+
+// UI 업데이트
+function updateSignupLockUI() {
+  const btn = document.getElementById('toggle-signup-lock-btn');
+  const status = document.getElementById('signup-lock-status');
+  
+  if (btn) {
+    btn.textContent = isSignupLocked ? '🔓 제한 해제하기' : '🔒 제한 걸기';
+    btn.style.background = isSignupLocked ? '#2ed573' : '#ff4757';
+  }
+  if (status) {
+    status.textContent = isSignupLocked 
+      ? '⛔ 현재 신규 계정 가입이 차단되어 있습니다.' 
+      : '✅ 신규 계정 가입이 가능합니다.';
+  }
+}
+
+// 가입 제한 토글
+async function toggleSignupLock() {
+  const newLockStatus = !isSignupLocked;
+  
+  // is_signup_enabled = true 면 가입 가능, false 면 가입 불가
+  const { error } = await supabaseClient
+    .from('profiles')
+    .update({ is_signup_enabled: !newLockStatus })
+    .eq('id', currentUserId);
+  
+  if (error) {
+    showToast("오류", "설정 변경에 실패했습니다.", "#ff4757");
+    return;
+  }
+  
+  isSignupLocked = newLockStatus;
+  updateSignupLockUI();
+  showToast("설정 변경", isSignupLocked ? "신규 가입이 차단되었습니다." : "신규 가입이 허용되었습니다.", "#2ed573");
 }
