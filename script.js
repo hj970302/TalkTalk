@@ -1114,15 +1114,9 @@ function renderMessageRange(container, from, to, prepend = false) {
 const msgs = _allMessages.slice(from, to);
 if (msgs.length === 0) return;
 
-// prepend(위에 추가)할 때는 fragment를 앞에 삽입
-const frag = document.createDocumentFragment();
+// 새로 추가할 행들을 먼저 만든다 (날짜 구분선 포함)
+// lastDateLabel: 이전 메시지의 날짜 — prepend가 아닐 땐 null로 시작
 let lastDateLabel = null;
-
-// prepend 시 기준이 되는 마지막 날짜 (이미 렌더링된 첫 메시지의 날짜)
-if (prepend && container.querySelector('[data-date-label]')) {
-lastDateLabel = container.querySelector('[data-date-label]').getAttribute('data-date-label');
-}
-
 const rows = [];
 for (const msg of msgs) {
 const dateLabel = msgDateLabel(msg.created_at);
@@ -1139,25 +1133,28 @@ if (row) rows.push(row);
 }
 
 if (prepend) {
-// 기존 맨 위(loadmore 버튼 바로 아래)에 삽입
+// 삽입 기준점: load-more-trigger 바로 다음 위치
 const trigger = container.querySelector('.load-more-trigger');
-rows.forEach(r => {
-if (trigger) container.insertBefore(r, trigger.nextSibling);
-else container.prepend(r);
-});
-// 중복 날짜 구분선 제거: 방금 삽입한 마지막 날짜 == 원래 첫 날짜이면 원래 것 제거
-const allSeps = container.querySelectorAll('[data-date-label]');
-for (let i = 0; i < allSeps.length - 1; i++) {
-if (allSeps[i].getAttribute('data-date-label') === allSeps[i+1].getAttribute('data-date-label')) {
-allSeps[i+1].remove();
+const anchor = trigger ? trigger.nextSibling : container.firstChild;
+rows.forEach(r => container.insertBefore(r, anchor));
+
+// 새로 추가한 마지막 날짜와 기존 첫 번째 날짜가 같으면 기존 것 제거
+const newLastSepDate = lastDateLabel;
+const allSeps = Array.from(container.querySelectorAll('[data-date-label]'));
+const insertedSeps = rows.filter(r => r.hasAttribute && r.hasAttribute('data-date-label'));
+const insertedCount = insertedSeps.length;
+if (insertedCount > 0 && allSeps.length > insertedCount) {
+const firstOldSep = allSeps[insertedCount];
+if (firstOldSep.getAttribute('data-date-label') === newLastSepDate) {
+firstOldSep.remove();
 }
 }
 } else {
+const frag = document.createDocumentFragment();
 rows.forEach(r => frag.appendChild(r));
 container.appendChild(frag);
 }
 }
-
 // 상단 "이전 메시지 불러오기" 트리거 삽입
 function insertLoadMoreTrigger(container, roomId) {
 const existing = container.querySelector('.load-more-trigger');
