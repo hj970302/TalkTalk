@@ -2204,11 +2204,11 @@ updateThemeCards();
 }
 
 function updateThemeCards() {
-const themes = ['white', 'dark', 'pokemon'];  // 'pokemon' 추가
-themes.forEach(t => {
-const card = document.getElementById('theme-' + t);
-if (card) card.classList.toggle('selected', currentTheme === t);
-});
+  const themes = ['white', 'dark', 'pokemon'];
+  themes.forEach(t => {
+    const card = document.getElementById('theme-' + t);
+    if (card) card.classList.toggle('selected', currentTheme === t);
+  });
 }
 
 /* ============================================================
