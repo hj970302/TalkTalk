@@ -121,36 +121,70 @@ element.innerHTML = '<i class="ti ti-user"></i>';
 window.addEventListener('DOMContentLoaded', async () => { await initApp(); });
 
 async function initApp() {
-const authScreen = document.getElementById('auth-screen');
-const splashLogo = document.getElementById('splash-logo');
-const savedSession = localStorage.getItem('talktalk_session');
+  const authScreen = document.getElementById('auth-screen');
+  const splashLogo = document.getElementById('splash-logo');
+  const savedSession = localStorage.getItem('talktalk_session');
 
-// ✅ 앱 활성화 상태 감지 (추가)
-document.addEventListener('visibilitychange', () => {
-isAppActive = !document.hidden;
-console.log('앱 활성화 상태:', isAppActive ? '활성화 (푸시 알림 OFF)' : '비활성화 (푸시 알림 ON)');
-});
-isAppActive = !document.hidden;
+  // ✅ 앱 활성화 상태 감지 및 DB 업데이트
+  const updateAppActiveStatus = async () => {
+    isAppActive = !document.hidden;
+    if (currentUserId) {
+      await supabaseClient
+        .from('profiles')
+        .update({ is_app_active: isAppActive })
+        .eq('id', currentUserId);
+    }
+    console.log('앱 활성화 상태:', isAppActive ? '활성화' : '비활성화');
+  };
 
-if (savedSession) {
-try {
-const { data: { session }, error } = await supabaseClient.auth.getSession();
-if (!error && session?.user) {
-// ✅ DB에서 로그인 상태 확인
-const { data: profile, error: profileError } = await supabaseClient
-.from('profiles')
-.select('is_logged_in')
-.eq('id', session.user.id)
-.single();
+  document.addEventListener('visibilitychange', updateAppActiveStatus);
+  await updateAppActiveStatus(); // 초기 상태 저장
 
-// ✅ 이미 다른 기기에서 로그인되어 있으면 세션 무효화
-if (!profileError && profile && !profile.is_logged_in) {
-console.log('다른 기기에서 로그인되어 세션이 무효화됨');
-localStorage.removeItem('talktalk_session');
-await supabaseClient.auth.signOut();
-showToast("알림", "다른 기기에서 로그인되어 로그아웃되었습니다.", "#ff4757");
-if (authScreen) authScreen.style.display = 'flex';
-return;
+  if (savedSession) {
+    try {
+      const { data: { session }, error } = await supabaseClient.auth.getSession();
+      if (!error && session?.user) {
+        // ✅ DB에서 로그인 상태 확인
+        const { data: profile, error: profileError } = await supabaseClient
+          .from('profiles')
+          .select('is_logged_in')
+          .eq('id', session.user.id)
+          .single();
+
+        // ✅ 이미 다른 기기에서 로그인되어 있으면 세션 무효화
+        if (!profileError && profile && !profile.is_logged_in) {
+          console.log('다른 기기에서 로그인되어 세션이 무효화됨');
+          localStorage.removeItem('talktalk_session');
+          await supabaseClient.auth.signOut();
+          showToast("알림", "다른 기기에서 로그인되어 로그아웃되었습니다.", "#ff4757");
+          if (authScreen) authScreen.style.display = 'flex';
+          return;
+        }
+
+        currentUserId = session.user.id;
+        if (authScreen) authScreen.style.display = 'none';
+        await loadUserData(session.user.id);
+        
+        // ✅ 로그인 후 앱 상태 DB 업데이트
+        await updateAppActiveStatus();
+        
+        showToast("환영합니다", `${currentUserProfile?.name || '사용자'}님, 자동 로그인되었습니다.`, "#fee500");
+        return;
+      }
+    } catch(e) {
+      console.log('세션 복원 오류:', e);
+    }
+  }
+
+  // 로그인 안 된 경우에만 스플래시 표시
+  if (authScreen) {
+    authScreen.style.display = 'flex';
+    if (splashLogo) splashLogo.style.display = 'flex';
+  }
+  setTimeout(() => {
+    if (splashLogo) splashLogo.style.display = 'none';
+    toggleAuthForm('login');
+  }, 1500);
 }
 
 currentUserId = session.user.id;
@@ -1227,23 +1261,26 @@ async function sendPushNotification(text, isImage = false) {
     const otherIds = currentRoom.members?.filter(id => id !== currentUserId) || [];
     if (otherIds.length === 0) return;
 
-    // ✅ 받는 사람들의 OneSignal ID 조회
+    // ✅ 받는 사람들의 앱 상태 확인
     const { data: profiles } = await supabaseClient
       .from('profiles')
-      .select('onesignal_player_id')
+      .select('onesignal_player_id, is_app_active')
       .in('id', otherIds);
 
-    const player_ids = profiles?.map(p => p.onesignal_player_id).filter(Boolean) || [];
-    if (player_ids.length === 0) return;
+    // ✅ 앱이 꺼져 있는 사람에게만 푸시 알림 전송
+    const inactivePlayers = profiles
+      ?.filter(p => p.is_app_active === false && p.onesignal_player_id)
+      .map(p => p.onesignal_player_id) || [];
+    
+    if (inactivePlayers.length === 0) return;
 
     const messageText = isImage ? '📷 사진' : (text.length > 50 ? text.substring(0, 50) + '...' : text);
 
-    // ✅ 받는 사람에게 푸시 알림 전송 (보내는 사람 상태와 무관)
     await fetch('https://talk-talk-phi.vercel.app/api/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        player_ids,
+        player_ids: inactivePlayers,
         title: currentUserProfile?.name || '톡톡',
         message: messageText,
       })
