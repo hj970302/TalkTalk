@@ -832,3 +832,181 @@ html, body {
   margin-left: 6px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
+
+/* ============================================================
+   헬로키티 테마 (Hello Kitty)
+   ============================================================ */
+[data-theme="hellokitty"] {
+  --bg: #ffeef4;
+  --bg2: #ffe0eb;
+  --bg3: #ffd5e3;
+  --border: #ffc0d0;
+  --text: #c44569;
+  --text2: #e6678a;
+  --text3: #f5a3b9;
+  --card: #ffffff;
+  --input-bg: #fffafc;
+  --bubble-mine: #ffb7c5;
+  --bubble-mine-text: #c44569;
+  --bubble-other: #ffffff;
+  --room-top: #ffb7c5;
+  --chat-bg: #ffeef4;
+  --more-hero: #ffb7c5;
+  --section-title: #f5a3b9;
+  --swipe-bg: #ffeef4;
+  --chat-item-bg: #ffeef4;
+  --tab-bar: #ffeef4;
+}
+
+/* 헤더 배경 */
+[data-theme="hellokitty"] .top-bar {
+  background: #ffb7c5 !important;
+}
+
+/* 헤더 아이콘 색상 */
+[data-theme="hellokitty"] .top-icons i,
+[data-theme="hellokitty"] .back-btn,
+[data-theme="hellokitty"] .room-icons i {
+  color: #c44569 !important;
+}
+
+/* 헬로키티 리본 원형 */
+.hellokitty-circle {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 8px;
+  border-radius: 50%;
+  background: #ffb7c5;
+  position: relative;
+  transition: transform 0.3s ease;
+  overflow: hidden;
+  box-shadow: 0 0 0 2px #c44569, 0 0 0 4px #ffe0eb;
+}
+
+/* 헬로키티 귀 */
+.hellokitty-circle::before {
+  content: "🎀";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 22px;
+  z-index: 2;
+}
+
+.theme-hellokitty-card:hover .hellokitty-circle {
+  transform: scale(1.05);
+  animation: kittyWiggle 0.3s ease-in-out;
+}
+
+@keyframes kittyWiggle {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.theme-card.selected .hellokitty-circle {
+  box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #c44569;
+  animation: kittyGlow 0.5s ease;
+}
+
+@keyframes kittyGlow {
+  0% { box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #c44569; }
+  50% { box-shadow: 0 0 0 6px #ffde6e, 0 0 0 8px #c44569; }
+  100% { box-shadow: 0 0 0 2px #ffde6e, 0 0 0 4px #c44569; }
+}
+
+/* 탭바 아이콘 (헬로키티 스타일 - 리본/고양이 이미지) */
+[data-theme="hellokitty"] #tab-friends i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-color: transparent !important;
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+}
+[data-theme="hellokitty"] #tab-friends i::before { content: "" !important; display: none; }
+
+[data-theme="hellokitty"] #tab-chats i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/4.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-color: transparent !important;
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+}
+[data-theme="hellokitty"] #tab-chats i::before { content: "" !important; display: none; }
+
+[data-theme="hellokitty"] #tab-more i {
+  background-image: url('https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/7.png') !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-color: transparent !important;
+  width: 24px;
+  height: 24px;
+  display: inline-block;
+}
+[data-theme="hellokitty"] #tab-more i::before { content: "" !important; display: none; }
+
+/* 채팅방 배경 - 여기에 님이 가져올 사진 URL을 넣으세요 */
+[data-theme="hellokitty"] #screen-room {
+  background-image: url('https://yrndqghsdtxoajgxvqrv.supabase.co/storage/v1/object/public/chat-images/hellokitty.jpg') !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 배경 위에 살짝 오버레이 (가독성) */
+[data-theme="hellokitty"] #room-messages {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+}
+
+/* 말풍선 */
+[data-theme="hellokitty"] .bubble.mine {
+  background: #ffb7c5 !important;
+  color: #c44569 !important;
+}
+[data-theme="hellokitty"] .bubble.other {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: #c44569 !important;
+}
+
+/* 채팅방 상단 */
+[data-theme="hellokitty"] .room-top {
+  background: #ffb7c5 !important;
+}
+[data-theme="hellokitty"] .room-title {
+  color: #c44569 !important;
+}
+
+/* 더보기 헤더 */
+[data-theme="hellokitty"] .more-hero {
+  background: #ffb7c5 !important;
+}
+
+/* 탭바 활성화 색상 */
+[data-theme="hellokitty"] .tab-btn.active {
+  color: #e6678a !important;
+}
+
+/* 로딩 스피너 (헬로키티 스타일) */
+[data-theme="hellokitty"] .loading-spinner {
+  width: 40px;
+  height: 40px;
+  margin: 20px auto;
+  background-image: url('https://cdn-icons-png.flaticon.com/512/1218/1218643.png');
+  background-size: contain;
+  animation: kittySpin 1s infinite linear;
+}
+@keyframes kittySpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
