@@ -1048,6 +1048,11 @@ await loadMessages(room.id);
 await markMessagesAsRead(room.id);
 }
 
+// 페이지네이션 상태
+let _allMessages = [];       // 필터링된 전체 메시지 배열
+let _renderedOffset = 0;     // 현재까지 렌더링된 개수 (뒤에서부터)
+const PAGE_SIZE = 30;
+
 async function loadMessages(roomId) {
 const container = document.getElementById('room-messages');
 if (!container) return;
@@ -1055,7 +1060,7 @@ if (!container) return;
 // 로딩 표시
 container.innerHTML = '<div class="loading-spinner"></div><div style="text-align:center; padding:20px;">메시지 불러오는 중...</div>';
 
-// 1. 메시지만 먼저 가져오기
+// 1. 메시지 전체 가져오기
 const { data: messages } = await supabaseClient
 .from('messages')
 .select('*')
@@ -1073,34 +1078,137 @@ return friendsList.find(f => f.id === id);
 
 window._roomMemberProfiles = memberProfiles;
 
-// 4. 메시지 렌더링
-container.innerHTML = `<div class="date-sep"><span>${dateStr()}</span></div>`;
-
-for (const msg of messages || []) {
-if (msg.deleted_for_all) continue;
-if (blockedList.includes(msg.sender_id)) continue;
-
-// ✅ 내가 나가서 삭제한 메시지는 안 보이게 필터링
+// 4. 필터링 후 전체 보관
+_allMessages = (messages || []).filter(msg => {
+if (msg.deleted_for_all) return false;
+if (blockedList.includes(msg.sender_id)) return false;
 const deletedForMe = msg.deleted_for_me || [];
-if (deletedForMe.includes(currentUserId)) continue;
+if (deletedForMe.includes(currentUserId)) return false;
+return true;
+});
 
-appendMessageToUI(msg);
+// 5. 최근 PAGE_SIZE개만 렌더링
+container.innerHTML = '';
+_renderedOffset = Math.max(0, _allMessages.length - PAGE_SIZE);
+renderMessageRange(container, _renderedOffset, _allMessages.length);
+
+// 6. 더 불러올 메시지가 있으면 상단 트리거 추가
+if (_renderedOffset > 0) {
+insertLoadMoreTrigger(container, roomId);
 }
 
 container.scrollTop = container.scrollHeight;
+
+// 7. 스크롤 이벤트로 상단 도달 감지
+container.onscroll = () => handleMessageScroll(container, roomId);
 }
 
-function appendMessageToUI(msg) {
-const container = document.getElementById('room-messages');
-if (!container) return;
-if (msg.id && container.querySelector(`[data-msg-id="${msg.id}"]`)) return;
+// 날짜 문자열 변환 (YYYY년 M월 D일)
+function msgDateLabel(isoStr) {
+const d = new Date(isoStr);
+return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일`;
+}
 
+// 메시지 범위 렌더링 + 날짜 구분선 삽입
+function renderMessageRange(container, from, to, prepend = false) {
+const msgs = _allMessages.slice(from, to);
+if (msgs.length === 0) return;
+
+// prepend(위에 추가)할 때는 fragment를 앞에 삽입
+const frag = document.createDocumentFragment();
+let lastDateLabel = null;
+
+// prepend 시 기준이 되는 마지막 날짜 (이미 렌더링된 첫 메시지의 날짜)
+if (prepend && container.querySelector('[data-date-label]')) {
+lastDateLabel = container.querySelector('[data-date-label]').getAttribute('data-date-label');
+}
+
+const rows = [];
+for (const msg of msgs) {
+const dateLabel = msgDateLabel(msg.created_at);
+if (dateLabel !== lastDateLabel) {
+const sep = document.createElement('div');
+sep.className = 'date-sep';
+sep.setAttribute('data-date-label', dateLabel);
+sep.innerHTML = `<span>${dateLabel}</span>`;
+rows.push(sep);
+lastDateLabel = dateLabel;
+}
+const row = buildMessageRow(msg);
+if (row) rows.push(row);
+}
+
+if (prepend) {
+// 기존 맨 위(loadmore 버튼 바로 아래)에 삽입
+const trigger = container.querySelector('.load-more-trigger');
+rows.forEach(r => {
+if (trigger) container.insertBefore(r, trigger.nextSibling);
+else container.prepend(r);
+});
+// 중복 날짜 구분선 제거: 방금 삽입한 마지막 날짜 == 원래 첫 날짜이면 원래 것 제거
+const allSeps = container.querySelectorAll('[data-date-label]');
+for (let i = 0; i < allSeps.length - 1; i++) {
+if (allSeps[i].getAttribute('data-date-label') === allSeps[i+1].getAttribute('data-date-label')) {
+allSeps[i+1].remove();
+}
+}
+} else {
+rows.forEach(r => frag.appendChild(r));
+container.appendChild(frag);
+}
+}
+
+// 상단 "이전 메시지 불러오기" 트리거 삽입
+function insertLoadMoreTrigger(container, roomId) {
+const existing = container.querySelector('.load-more-trigger');
+if (existing) existing.remove();
+const btn = document.createElement('div');
+btn.className = 'load-more-trigger';
+btn.style.cssText = 'text-align:center; padding:10px 0; color:#888; font-size:13px; cursor:pointer; user-select:none;';
+btn.textContent = '▲ 이전 메시지 보기';
+btn.onclick = () => loadMoreMessages(container, roomId);
+container.prepend(btn);
+}
+
+// 위로 스크롤 시 자동 감지
+function handleMessageScroll(container, roomId) {
+if (container.scrollTop < 60 && _renderedOffset > 0) {
+loadMoreMessages(container, roomId);
+}
+}
+
+// 이전 메시지 30개 추가 로드
+function loadMoreMessages(container, roomId) {
+if (_renderedOffset <= 0) return;
+const prevScrollHeight = container.scrollHeight;
+const prevScrollTop = container.scrollTop;
+
+const newOffset = Math.max(0, _renderedOffset - PAGE_SIZE);
+renderMessageRange(container, newOffset, _renderedOffset, true);
+_renderedOffset = newOffset;
+
+// 스크롤 위치 유지 (위에 내용이 추가돼도 현재 보던 위치 유지)
+requestAnimationFrame(() => {
+container.scrollTop = prevScrollTop + (container.scrollHeight - prevScrollHeight);
+});
+
+if (_renderedOffset <= 0) {
+const trigger = container.querySelector('.load-more-trigger');
+if (trigger) trigger.remove();
+container.onscroll = null;
+} else {
+insertLoadMoreTrigger(container, roomId);
+}
+}
+
+// 메시지 하나를 DOM 요소로 빌드 (기존 appendMessageToUI 로직 분리)
+function buildMessageRow(msg) {
+const container = document.getElementById('room-messages');
 const isMine = msg.sender_id === currentUserId;
 const row = document.createElement('div');
 row.className = `msg-row ${isMine ? 'mine' : 'other'}`;
 if (msg.id) row.setAttribute('data-msg-id', msg.id);
 
-// 상대방 아바타
 if (!isMine) {
 const profiles = window._roomMemberProfiles || [];
 const senderProfile = profiles.find(p => p.id === msg.sender_id);
@@ -1119,7 +1227,6 @@ avEl.innerHTML = '<i class="ti ti-user"></i>';
 }
 row.appendChild(avEl);
 
-// 단체방이면 이름도 표시
 if (currentRoom.is_group) {
 const bwrap = document.createElement('div');
 bwrap.className = 'bwrap';
@@ -1132,9 +1239,7 @@ bwrap.appendChild(nameEl);
 bwrap.appendChild(bubble);
 bwrap.appendChild(meta);
 row.appendChild(bwrap);
-container.appendChild(row);
-container.scrollTop = container.scrollHeight;
-return;
+return row;
 }
 }
 
@@ -1145,8 +1250,35 @@ const meta = makeMetaEl(msg.created_at);
 bwrap.appendChild(bubble);
 bwrap.appendChild(meta);
 row.appendChild(bwrap);
+return row;
+}
+
+function appendMessageToUI(msg) {
+const container = document.getElementById('room-messages');
+if (!container) return;
+if (msg.id && container.querySelector(`[data-msg-id="${msg.id}"]`)) return;
+
+// 날짜 구분선: 마지막으로 표시된 날짜와 다르면 삽입
+const newDateLabel = msgDateLabel(msg.created_at);
+const allSeps = container.querySelectorAll('[data-date-label]');
+const lastSep = allSeps.length > 0 ? allSeps[allSeps.length - 1] : null;
+const lastDateLabelVal = lastSep ? lastSep.getAttribute('data-date-label') : null;
+if (newDateLabel !== lastDateLabelVal) {
+const sep = document.createElement('div');
+sep.className = 'date-sep';
+sep.setAttribute('data-date-label', newDateLabel);
+sep.innerHTML = `<span>${newDateLabel}</span>`;
+container.appendChild(sep);
+}
+
+// _allMessages에도 추가 (페이지네이션 상태 동기화)
+_allMessages.push(msg);
+
+const row = buildMessageRow(msg);
+if (row) {
 container.appendChild(row);
 container.scrollTop = container.scrollHeight;
+}
 }
 
 function makeBubbleEl(msg, isMine) {
