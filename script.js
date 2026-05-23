@@ -334,41 +334,50 @@ showToast("가입 축하", name + "님의 아이디가 생성되었습니다.", 
 }
 
 async function handleLogin() {
-const username = document.getElementById('login-id').value.trim();
-const pw = document.getElementById('login-pw').value.trim();
-if (!username || !pw) { alert("아이디와 비밀번호를 모두 입력해주세요."); return; }
+  const username = document.getElementById('login-id').value.trim();
+  const pw = document.getElementById('login-pw').value.trim();
+  if (!username || !pw) { alert("아이디와 비밀번호를 모두 입력해주세요."); return; }
 
-// ✅ 로그인 상태 확인 (이미 로그인된 계정인지)
-const { data: profile, error: profileError } = await supabaseClient
-.from('profiles').select('id, username, name, is_logged_in').eq('username', username).maybeSingle();
-if (profileError || !profile) { alert("아이디 또는 비밀번호가 일치하지 않습니다."); return; }
+  // ✅ 로그인 상태 확인 (이미 로그인된 계정인지)
+  const { data: profile, error: profileError } = await supabaseClient
+    .from('profiles')
+    .select('id, username, name, is_logged_in, is_banned')  // ← is_banned 추가!
+    .eq('username', username)
+    .maybeSingle();
+  
+  if (profileError || !profile) { alert("아이디 또는 비밀번호가 일치하지 않습니다."); return; }
 
-// ✅ 이미 로그인된 계정이면 차단
-if (profile.is_logged_in) {
-alert("⚠️ 이미 다른 기기에서 로그인되어 있는 계정입니다.\n로그아웃 후 시도해주세요.");
-return;
+  // ✅ 밴 당한 계정인지 확인 (가장 먼저 체크)
+  if (profile.is_banned) {
+    alert("⚠️ 관리자에 의해 차단된 계정입니다.\n문의하세요.");
+    return;
+  }
+
+  // ✅ 이미 로그인된 계정이면 차단
+  if (profile.is_logged_in) {
+    alert("⚠️ 이미 다른 기기에서 로그인되어 있는 계정입니다.\n로그아웃 후 시도해주세요.");
+    return;
+  }
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email: username + "@talktalk.app", password: pw
+  });
+  if (error) { alert("아이디 또는 비밀번호가 일치하지 않습니다."); return; }
+
+  localStorage.setItem('talktalk_session', data.user.id);
+  currentUserId = data.user.id;
+
+  // ✅ 로그인 상태 업데이트 (밴 상태는 건드리지 않음)
+  await supabaseClient.from('profiles').update({ 
+    is_logged_in: true,
+    last_login_at: new Date().toISOString()
+  }).eq('id', data.user.id);
+
+  await loadUserData(data.user.id);
+  document.getElementById('auth-screen').style.display = 'none';
+  showToast("로그인 성공", profile.name + "님 반갑습니다!", "#fee500");
+  ['login-id','login-pw'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
 }
-
-const { data, error } = await supabaseClient.auth.signInWithPassword({
-email: username + "@talktalk.app", password: pw
-});
-if (error) { alert("아이디 또는 비밀번호가 일치하지 않습니다."); return; }
-
-localStorage.setItem('talktalk_session', data.user.id);
-currentUserId = data.user.id;
-
-// ✅ 로그인 상태 업데이트
-await supabaseClient.from('profiles').update({ 
-is_logged_in: true,
-last_login_at: new Date().toISOString()
-}).eq('id', data.user.id);
-
-await loadUserData(data.user.id);
-document.getElementById('auth-screen').style.display = 'none';
-showToast("로그인 성공", profile.name + "님 반갑습니다!", "#fee500");
-['login-id','login-pw'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-}
-
 async function handleLogout() {
 // ✅ 로그아웃 시 로그인 상태 false로 변경
 if (currentUserId) {
@@ -1996,9 +2005,24 @@ listEl.innerHTML = profiles.filter(p => p.id !== currentUserId).map(p => `
  `).join('') || '<div style="padding:12px;text-align:center;">사용자 없음</div>';
 }
 async function toggleBanUser(userId, isBanned) {
-await supabaseClient.from('profiles').update({ is_banned: !isBanned }).eq('id', userId);
-renderAdminBanList();
-showToast("관리자", !isBanned ? "사용자를 밴했습니다." : "밴을 해제했습니다.", "#5352ed");
+  const newBanStatus = !isBanned;
+  
+  // 밴을 하면 강제 로그아웃도 함께 처리
+  await supabaseClient
+    .from('profiles')
+    .update({ 
+      is_banned: newBanStatus,
+      is_logged_in: newBanStatus ? false : true  // 밴 당하면 로그아웃
+    })
+    .eq('id', userId);
+  
+  renderAdminBanList();
+  
+  if (newBanStatus) {
+    showToast("관리자", "사용자를 밴 처리했습니다. (강제 로그아웃됨)", "#ff4757");
+  } else {
+    showToast("관리자", "밴을 해제했습니다.", "#2ed573");
+  }
 }
 
 /* ============================================================
