@@ -2330,3 +2330,24 @@ function appendMessageToUI(msg) {
   container.appendChild(row);
   container.scrollTop = container.scrollHeight;
 }
+
+function handleScrollLoadMore() {
+  const container = document.getElementById('room-messages');
+  if (!container) return;
+  
+  console.log('🟢 스크롤 감지됨 - scrollTop:', container.scrollTop);
+  console.log('isLoadingMoreMessages:', isLoadingMoreMessages);
+  console.log('hasMoreMessages:', hasMoreMessages);
+  console.log('currentLoadingRoomId:', currentLoadingRoomId);
+  console.log('currentRoom?.id:', currentRoom?.id);
+  
+  if (container.scrollTop === 0 && !isLoadingMoreMessages && hasMoreMessages && currentLoadingRoomId === currentRoom?.id) {
+    console.log('✅ 조건 만족! 추가 로드 실행!');
+    isLoadingMoreMessages = true;
+    loadMessages(currentRoom.id, true).finally(() => {
+      isLoadingMoreMessages = false;
+    });
+  } else {
+    console.log('❌ 조건 불만족');
+  }
+}
