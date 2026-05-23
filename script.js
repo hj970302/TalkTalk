@@ -1223,16 +1223,11 @@ return meta;
   메시지 전송
   ============================================================ */
 async function sendPushNotification(text, isImage = false) {
-  // ✅ 앱이 활성화되어 있으면 (켜져 있으면) 푸시 알림 보내지 않음
-  if (isAppActive) {
-    console.log('앱 켜져 있음 - 푸시 알림 생략');
-    return;
-  }
-  
   try {
     const otherIds = currentRoom.members?.filter(id => id !== currentUserId) || [];
     if (otherIds.length === 0) return;
 
+    // ✅ 받는 사람들의 OneSignal ID 조회
     const { data: profiles } = await supabaseClient
       .from('profiles')
       .select('onesignal_player_id')
@@ -1243,6 +1238,7 @@ async function sendPushNotification(text, isImage = false) {
 
     const messageText = isImage ? '📷 사진' : (text.length > 50 ? text.substring(0, 50) + '...' : text);
 
+    // ✅ 받는 사람에게 푸시 알림 전송 (보내는 사람 상태와 무관)
     await fetch('https://talk-talk-phi.vercel.app/api/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
